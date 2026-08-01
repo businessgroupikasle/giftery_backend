@@ -5,6 +5,8 @@ import { logger } from './config/logger.js';
 import { initSockets } from './sockets/index.js';
 import prisma from './config/db.js';
 
+import { seedDatabase } from './utils/seed.js';
+
 const server = http.createServer(app);
 
 // ── Socket.IO ───────────────────────────────────────────────────
@@ -15,9 +17,9 @@ server.listen(env.PORT, async () => {
   try {
     await prisma.$connect();
     logger.info(`✅ Database connected`);
+    await seedDatabase();
   } catch (err) {
-    logger.error('❌ Database connection failed:', err);
-    process.exit(1);
+    logger.warn('⚠️ Database connection warning:', err.message);
   }
   logger.info(`🚀 Server running on http://localhost:${env.PORT} [${env.NODE_ENV}]`);
   logger.info(`📡 API docs available at http://localhost:${env.PORT}/api/v1/health`);

@@ -13,10 +13,10 @@ const sortMap = {
 
 export const productService = {
   getAll: async (query) => {
-    const { page, limit, search, categoryId, minPrice, maxPrice, sort, featured } = query;
+    const { page, limit, search, categoryId, minPrice, maxPrice, sort, featured, showAll } = query;
 
     const where = {
-      isActive: true,
+      ...(showAll !== 'true' && { isActive: true }),
       ...(search && { name: { contains: search, mode: 'insensitive' } }),
       ...(categoryId && { categoryId }),
       ...(featured !== undefined && { featured: featured === 'true' }),

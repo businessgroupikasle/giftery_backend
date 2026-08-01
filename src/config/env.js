@@ -23,7 +23,7 @@ const envSchema = z.object({
   MAX_FILE_SIZE: z.string().default('5242880').transform(Number),
   ALLOWED_FILE_TYPES: z.string().default('image/jpeg,image/png,image/webp'),
   RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform(Number),
-  RATE_LIMIT_MAX: z.string().default('100').transform(Number),
+  RATE_LIMIT_MAX: z.string().default('1000').transform(Number),
   AUTH_RATE_LIMIT_MAX: z.string().default('10').transform(Number),
   LOG_LEVEL: z.string().default('info'),
   LOG_DIR: z.string().default('logs'),

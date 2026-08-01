@@ -40,7 +40,9 @@ export const authorize = (...roles) => {
     if (!req.user) {
       return sendError(res, 'Not authenticated', HTTP_STATUS.UNAUTHORIZED);
     }
-    if (!roles.includes(req.user.role)) {
+    const userRole = req.user.role;
+    const hasPermission = roles.includes(userRole) || (userRole === 'SUPER_ADMIN' && roles.includes('ADMIN'));
+    if (!hasPermission) {
       return sendError(res, 'Access forbidden: insufficient permissions', HTTP_STATUS.FORBIDDEN);
     }
     next();

@@ -3,10 +3,31 @@ import { sendSuccess } from '../utils/response.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
 
 export const authController = {
+  requestOTP: async (req, res, next) => {
+    try {
+      const result = await authService.requestOTP(req.body);
+      sendSuccess(res, result, result.message, HTTP_STATUS.OK);
+    } catch (err) { next(err); }
+  },
+
   register: async (req, res, next) => {
     try {
-      const { user, token } = await authService.register(req.body);
-      sendSuccess(res, { user, token }, 'Account created successfully', HTTP_STATUS.CREATED);
+      const result = await authService.register(req.body);
+      sendSuccess(res, result, result.message || 'Account created successfully', HTTP_STATUS.CREATED);
+    } catch (err) { next(err); }
+  },
+
+  verifyEmail: async (req, res, next) => {
+    try {
+      const { user, token, message } = await authService.verifyEmail(req.body);
+      sendSuccess(res, { user, token }, message, HTTP_STATUS.OK);
+    } catch (err) { next(err); }
+  },
+
+  resendOTP: async (req, res, next) => {
+    try {
+      const result = await authService.resendOTP(req.body);
+      sendSuccess(res, result, result.message, HTTP_STATUS.OK);
     } catch (err) { next(err); }
   },
 

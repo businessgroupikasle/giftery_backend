@@ -21,12 +21,22 @@ async function main() {
   await prisma.user.deleteMany();
 
   // ── Users ───────────────────────────────────────────────────
+  const superAdminPassword = await bcrypt.hash('SuperAdmin@123', 12);
   const adminPassword = await bcrypt.hash('Admin@123', 12);
   const userPassword  = await bcrypt.hash('User@123', 12);
 
+  await prisma.user.create({
+    data: {
+      name: 'Super Admin',
+      email: 'superadmin@giftery.com',
+      password: superAdminPassword,
+      role: 'SUPER_ADMIN',
+    },
+  });
+
   const admin = await prisma.user.create({
     data: {
-      name: 'Admin User',
+      name: 'Store Admin',
       email: 'admin@giftery.com',
       password: adminPassword,
       role: 'ADMIN',
@@ -36,7 +46,7 @@ async function main() {
   const customer = await prisma.user.create({
     data: {
       name: 'Jane Doe',
-      email: 'jane@example.com',
+      email: 'user@giftery.com',
       password: userPassword,
       role: 'USER',
     },

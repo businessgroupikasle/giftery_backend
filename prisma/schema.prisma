@@ -15,6 +15,7 @@ datasource db {
 enum UserRole {
   USER
   ADMIN
+  SUPER_ADMIN
   VENDOR
 }
 
@@ -45,11 +46,14 @@ model User {
   email     String   @unique
   password  String
   role      UserRole @default(USER)
-  avatar    String?
-  phone     String?
-  isActive  Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  avatar            String?
+  phone             String?
+  isActive          Boolean  @default(true)
+  isEmailVerified   Boolean  @default(false)
+  verificationOTP   String?
+  otpExpiresAt      DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   orders    Order[]
   cart      Cart?
@@ -78,11 +82,14 @@ model Address {
 }
 
 model Category {
-  id       String  @id @default(cuid())
-  name     String
-  slug     String  @unique
-  image    String?
-  parentId String?
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  image       String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  parentId    String?
 
   parent   Category?  @relation("CategoryTree", fields: [parentId], references: [id])
   children Category[] @relation("CategoryTree")

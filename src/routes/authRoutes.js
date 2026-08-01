@@ -7,10 +7,13 @@ import { registerSchema, loginSchema, changePasswordSchema } from '../validation
 
 const router = Router();
 
-router.post('/register', authLimiter, validate(registerSchema), authController.register);
-router.post('/login',    authLimiter, validate(loginSchema),    authController.login);
-router.post('/logout',   authenticate,                          authController.logout);
-router.get('/me',        authenticate,                          authController.getMe);
+router.post('/request-otp',   authLimiter,                           authController.requestOTP);
+router.post('/register',      authLimiter, validate(registerSchema), authController.register);
+router.post('/verify-email',  authLimiter,                           authController.verifyEmail);
+router.post('/resend-otp',    authLimiter,                           authController.resendOTP);
+router.post('/login',         authLimiter, validate(loginSchema),    authController.login);
+router.post('/logout',        authenticate,                          authController.logout);
+router.get('/me',             authenticate,                          authController.getMe);
 router.put('/change-password', authenticate, validate(changePasswordSchema), authController.changePassword);
 
 export default router;

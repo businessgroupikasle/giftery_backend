@@ -10,6 +10,7 @@ export const createProductSchema = z.object({
   sku: z.string().optional(),
   weight: z.number().positive().optional(),
   featured: z.boolean().optional().default(false),
+  isActive: z.boolean().optional().default(true),
   categoryId: z.string().min(1, 'Category is required'),
 });
 

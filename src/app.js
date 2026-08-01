@@ -41,6 +41,7 @@ app.use('/uploads', express.static(path.join(__dirname, '..', env.UPLOAD_DIR)));
 
 // ── API Routes ──────────────────────────────────────────────────
 app.use('/api/v1', apiRoutes);
+app.use('/api', apiRoutes);
 
 // ── 404 Handler ─────────────────────────────────────────────────
 app.use((req, res) => {

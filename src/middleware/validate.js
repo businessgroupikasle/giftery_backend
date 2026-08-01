@@ -14,7 +14,8 @@ export const validate = (schema, source = 'body') => {
         field: issue.path.join('.'),
         message: issue.message,
       }));
-      return sendError(res, 'Validation failed', HTTP_STATUS.UNPROCESSABLE_ENTITY, errors);
+      const firstMessage = result.error.issues[0]?.message || 'Validation failed';
+      return sendError(res, firstMessage, HTTP_STATUS.UNPROCESSABLE_ENTITY, errors);
     }
     req[source] = result.data;
     next();

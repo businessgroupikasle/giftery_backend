@@ -1,12 +1,19 @@
 import { Router } from 'express';
-import authRoutes     from './authRoutes.js';
-import productRoutes  from './productRoutes.js';
-import categoryRoutes from './categoryRoutes.js';
-import cartRoutes     from './cartRoutes.js';
-import orderRoutes    from './orderRoutes.js';
-import wishlistRoutes from './wishlistRoutes.js';
-import reviewRoutes   from './reviewRoutes.js';
+import authRoutes      from './authRoutes.js';
+import productRoutes   from './productRoutes.js';
+import categoryRoutes  from './categoryRoutes.js';
+import cartRoutes      from './cartRoutes.js';
+import orderRoutes     from './orderRoutes.js';
+import wishlistRoutes  from './wishlistRoutes.js';
+import reviewRoutes    from './reviewRoutes.js';
 import dashboardRoutes from './dashboardRoutes.js';
+import corporateRoutes from './corporateRoutes.js';
+import catalogRoutes   from './catalogRoutes.js';
+import cmsRoutes       from './cmsRoutes.js';
+import reportRoutes    from './reportRoutes.js';
+import enquiryRoutes   from './enquiryRoutes.js';
+import uploadRoutes    from './uploadRoutes.js';
+import settingRoutes   from './settingRoutes.js';
 
 const router = Router();
 
@@ -20,5 +27,12 @@ router.use('/orders',     orderRoutes);
 router.use('/wishlist',   wishlistRoutes);
 router.use('/reviews',    reviewRoutes);
 router.use('/dashboard',  dashboardRoutes);
+router.use('/corporate',  corporateRoutes);
+router.use('/catalog',    catalogRoutes);
+router.use('/cms',        cmsRoutes);
+router.use('/reports',    reportRoutes);
+router.use('/enquiries',  enquiryRoutes);
+router.use('/uploads',    uploadRoutes);
+router.use('/settings',   settingRoutes);
 
 export default router;

@@ -7,48 +7,18 @@ services:
     container_name: shopzone_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: giftery-user
-      POSTGRES_PASSWORD: giftery-pass
-      POSTGRES_DB: giftery-ecommerce
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: giftery-db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # ── Backend ────────────────────────────────────────────────────
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: shopzone_backend
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    env_file:
-      - .env
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ecommerce
-      NODE_ENV: production
-      PORT: 5000
-      CORS_ORIGIN: http://localhost:3000
-    ports:
-      - "5000:5000"
-    volumes:
-      - backend_uploads:/app/uploads
-      - backend_logs:/app/logs
-
 volumes:
   postgres_data:
-  backend_uploads:
-  backend_logs:
-
-networks:
-  default:
-    name: shopzone_network
