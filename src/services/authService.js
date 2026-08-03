@@ -4,190 +4,164 @@ import { signToken } from '../utils/jwt.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
 import { emailService } from './emailService.js';
 
+// In-memory temporary OTP Store (Email -> { otp, name, expiresAt, verified })
+const pendingOTPStore = new Map();
+
 export const authService = {
+  /**
+   * Request OTP — Sends code via email without touching DB
+   */
   requestOTP: async ({ email, name }) => {
-    const existing = await authRepository.findByEmail(email);
+    const normalizedEmail = email.toLowerCase().trim();
+
+    const existing = await authRepository.findByEmail(normalizedEmail);
     if (existing && existing.isEmailVerified) {
-      const err = new Error('Email already registered and verified');
+      const err = new Error('Email is already registered and verified. Please sign in.');
       err.statusCode = HTTP_STATUS.CONFLICT;
       throw err;
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
-    const dummyPassword = await bcrypt.hash(Math.random().toString(), 10);
+    const expiresAt = Date.now() + 10 * 60 * 1000; // 10 mins
 
-    let user;
-    if (existing && !existing.isEmailVerified) {
-      user = await authRepository.update(existing.id, {
-        name: name || existing.name,
-        verificationOTP: otp,
-        otpExpiresAt: expiresAt,
-      });
-    } else {
-      user = await authRepository.create({
-        name: name || 'Valued User',
-        email,
-        password: dummyPassword,
-        isEmailVerified: false,
-        verificationOTP: otp,
-        otpExpiresAt: expiresAt,
-      });
-    }
+    pendingOTPStore.set(normalizedEmail, {
+      otp,
+      name: name || 'Valued User',
+      expiresAt,
+      verified: false,
+    });
 
-    await emailService.sendVerificationEmail({ name: user.name, email: user.email, otp });
+    await emailService.sendVerificationEmail({ name: name || 'Valued User', email: normalizedEmail, otp });
 
     return {
       success: true,
-      email: user.email,
-      otp,
-      message: `Verification code sent to ${user.email}`,
+      email: normalizedEmail,
+      message: `Verification code sent to ${normalizedEmail}`,
     };
   },
 
+  /**
+   * Verify Email / OTP Code inline
+   */
+  verifyEmail: async ({ email, otp }) => {
+    const normalizedEmail = email.toLowerCase().trim();
+    const record = pendingOTPStore.get(normalizedEmail);
+
+    if (!record) {
+      const err = new Error('No active OTP request found for this email. Please click Send OTP.');
+      err.statusCode = HTTP_STATUS.BAD_REQUEST;
+      throw err;
+    }
+
+    if (Date.now() > record.expiresAt) {
+      const err = new Error('Verification OTP code has expired. Please click Send OTP again.');
+      err.statusCode = HTTP_STATUS.BAD_REQUEST;
+      throw err;
+    }
+
+    if (record.otp !== otp?.trim()) {
+      const err = new Error('Invalid OTP code. Please check your email and try again.');
+      err.statusCode = HTTP_STATUS.BAD_REQUEST;
+      throw err;
+    }
+
+    record.verified = true;
+    pendingOTPStore.set(normalizedEmail, record);
+
+    return { success: true, message: 'OTP code verified successfully!' };
+  },
+
+  /**
+   * Register User — ONLY creates user in DB after OTP is verified & submit form is clicked
+   */
   register: async ({ name, email, password, otp }) => {
-    const existing = await authRepository.findByEmail(email);
-    
-    // If OTP is provided, validate OTP and complete registration in 1 step!
-    if (otp) {
-      if (!existing) {
-        const err = new Error('Please click Send OTP to verify your email first.');
-        err.statusCode = HTTP_STATUS.BAD_REQUEST;
-        throw err;
-      }
+    const normalizedEmail = email.toLowerCase().trim();
 
-      if (existing.isEmailVerified) {
-        const err = new Error('Email already registered. Please sign in.');
-        err.statusCode = HTTP_STATUS.CONFLICT;
-        throw err;
-      }
+    const existing = await authRepository.findByEmail(normalizedEmail);
+    if (existing && existing.isEmailVerified) {
+      const err = new Error('Email is already registered. Please sign in.');
+      err.statusCode = HTTP_STATUS.CONFLICT;
+      throw err;
+    }
 
-      if (existing.verificationOTP !== otp.trim()) {
-        const err = new Error('Invalid OTP code. Please check your email.');
-        err.statusCode = HTTP_STATUS.BAD_REQUEST;
-        throw err;
-      }
+    const record = pendingOTPStore.get(normalizedEmail);
+    if (!record || (!record.verified && record.otp !== otp?.trim())) {
+      const err = new Error('Please verify your OTP code before creating your account.');
+      err.statusCode = HTTP_STATUS.BAD_REQUEST;
+      throw err;
+    }
 
-      if (existing.otpExpiresAt && new Date(existing.otpExpiresAt) < new Date()) {
-        const err = new Error('OTP code expired. Please click Send OTP again.');
-        err.statusCode = HTTP_STATUS.BAD_REQUEST;
-        throw err;
-      }
+    if (Date.now() > record.expiresAt) {
+      const err = new Error('Verification OTP code expired. Please click Send OTP again.');
+      err.statusCode = HTTP_STATUS.BAD_REQUEST;
+      throw err;
+    }
 
-      const hashed = await bcrypt.hash(password, 12);
-      const updatedUser = await authRepository.update(existing.id, {
-        name,
-        password: hashed,
+    // Hash Password & Create User Record in Database NOW
+    const hashedPassword = await bcrypt.hash(password, 12);
+
+    let user;
+    if (existing) {
+      user = await authRepository.update(existing.id, {
+        name: name || record.name,
+        password: hashedPassword,
         isEmailVerified: true,
         verificationOTP: null,
         otpExpiresAt: null,
       });
-
-      const token = signToken({ id: updatedUser.id, role: updatedUser.role });
-      const { password: _, ...safeUser } = updatedUser;
-      return { user: safeUser, token, message: 'Account created and verified successfully!' };
-    }
-
-    // Fallback if OTP is not provided upfront
-    if (existing && existing.isEmailVerified) {
-      const err = new Error('Email already registered');
-      err.statusCode = HTTP_STATUS.CONFLICT;
-      throw err;
-    }
-
-    const hashed = await bcrypt.hash(password, 12);
-    const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-    let user;
-    if (existing && !existing.isEmailVerified) {
-      user = await authRepository.update(existing.id, {
-        name,
-        password: hashed,
-        verificationOTP: newOtp,
-        otpExpiresAt: expiresAt,
-      });
     } else {
       user = await authRepository.create({
-        name,
-        email,
-        password: hashed,
-        isEmailVerified: false,
-        verificationOTP: newOtp,
-        otpExpiresAt: expiresAt,
+        name: name || record.name,
+        email: normalizedEmail,
+        password: hashedPassword,
+        isEmailVerified: true,
+        verificationOTP: null,
+        otpExpiresAt: null,
       });
     }
 
-    await emailService.sendVerificationEmail({ name: user.name, email: user.email, otp: newOtp });
+    // Clean up temporary OTP store
+    pendingOTPStore.delete(normalizedEmail);
+
+    const token = signToken({ id: user.id, role: user.role });
+    const { password: _, ...safeUser } = user;
 
     return {
-      requiresVerification: true,
-      email: user.email,
-      otp: newOtp,
-      message: `Verification code sent to ${user.email}`,
+      user: safeUser,
+      token,
+      message: 'Account created and verified successfully!',
     };
   },
 
-  verifyEmail: async ({ email, otp }) => {
-    const user = await authRepository.findByEmail(email);
-    if (!user) {
-      const err = new Error('User account not found');
-      err.statusCode = HTTP_STATUS.NOT_FOUND;
-      throw err;
-    }
-
-    if (user.isEmailVerified) {
-      const token = signToken({ id: user.id, role: user.role });
-      const { password: _, ...safeUser } = user;
-      return { user: safeUser, token, message: 'Email already verified' };
-    }
-
-    if (user.verificationOTP !== otp) {
-      const err = new Error('Invalid verification code. Please check your email.');
-      err.statusCode = HTTP_STATUS.BAD_REQUEST;
-      throw err;
-    }
-
-    if (user.otpExpiresAt && new Date(user.otpExpiresAt) < new Date()) {
-      const err = new Error('Verification code expired. Please request a new code.');
-      err.statusCode = HTTP_STATUS.BAD_REQUEST;
-      throw err;
-    }
-
-    const updated = await authRepository.update(user.id, {
-      isEmailVerified: true,
-      verificationOTP: null,
-      otpExpiresAt: null,
-    });
-
-    const token = signToken({ id: updated.id, role: updated.role });
-    const { password: _, ...safeUser } = updated;
-    return { user: safeUser, token, message: 'Email verified successfully!' };
-  },
-
+  /**
+   * Resend OTP Code
+   */
   resendOTP: async ({ email }) => {
-    const user = await authRepository.findByEmail(email);
-    if (!user) {
-      const err = new Error('User account not found');
-      err.statusCode = HTTP_STATUS.NOT_FOUND;
-      throw err;
-    }
-
+    const normalizedEmail = email.toLowerCase().trim();
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const expiresAt = Date.now() + 10 * 60 * 1000;
 
-    await authRepository.update(user.id, {
-      verificationOTP: otp,
-      otpExpiresAt: expiresAt,
+    const existingRecord = pendingOTPStore.get(normalizedEmail);
+    const userName = existingRecord?.name || 'Valued User';
+
+    pendingOTPStore.set(normalizedEmail, {
+      otp,
+      name: userName,
+      expiresAt,
+      verified: false,
     });
 
-    await emailService.sendVerificationEmail({ name: user.name, email: user.email, otp });
+    await emailService.sendVerificationEmail({ name: userName, email: normalizedEmail, otp });
 
-    return { otp, message: `A new verification code (${otp}) has been dispatched.` };
+    return { message: `A new verification code has been sent to ${normalizedEmail}.` };
   },
 
+  /**
+   * Login User
+   */
   login: async ({ email, password }) => {
-    const user = await authRepository.findByEmail(email);
+    const normalizedEmail = email.toLowerCase().trim();
+    const user = await authRepository.findByEmail(normalizedEmail);
     if (!user) {
       const err = new Error('Invalid email or password');
       err.statusCode = HTTP_STATUS.UNAUTHORIZED;
@@ -205,19 +179,6 @@ export const authService = {
       throw err;
     }
 
-    if (user.role === 'USER' && !user.isEmailVerified) {
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-      await authRepository.update(user.id, { verificationOTP: otp, otpExpiresAt: expiresAt });
-      await emailService.sendVerificationEmail({ name: user.name, email: user.email, otp });
-
-      const err = new Error(`Email not verified. Your OTP code is ${otp}`);
-      err.statusCode = HTTP_STATUS.FORBIDDEN;
-      err.requiresVerification = true;
-      err.otp = otp;
-      throw err;
-    }
-
     const token = signToken({ id: user.id, role: user.role });
     const { password: _, ...safeUser } = user;
     return { user: safeUser, token };
@@ -226,9 +187,7 @@ export const authService = {
   getMe: async (id) => authRepository.findById(id),
 
   changePassword: async (id, { currentPassword, newPassword }) => {
-    const user = await authRepository.findByEmail(
-      (await authRepository.findById(id)).email
-    );
+    const user = await authRepository.findById(id);
     const fullUser = await authRepository.findByEmail(user.email);
     const isMatch = await bcrypt.compare(currentPassword, fullUser.password);
     if (!isMatch) {

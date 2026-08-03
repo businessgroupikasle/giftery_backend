@@ -12,6 +12,8 @@ const envSchema = z.object({
   CORS_ORIGIN: z.string().default('http://localhost:3000'),
   STRIPE_SECRET_KEY: z.string().startsWith('sk_').optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
+  RAZORPAY_KEY_ID: z.string().optional(),
+  RAZORPAY_KEY_SECRET: z.string().optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_PORT: z.string().default('587').transform(Number),
   SMTP_SECURE: z.string().default('false').transform((v) => v === 'true'),

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import authRoutes      from './authRoutes.js';
+import userRoutes      from './userRoutes.js';
 import productRoutes   from './productRoutes.js';
 import categoryRoutes  from './categoryRoutes.js';
 import cartRoutes      from './cartRoutes.js';
@@ -14,12 +15,14 @@ import reportRoutes    from './reportRoutes.js';
 import enquiryRoutes   from './enquiryRoutes.js';
 import uploadRoutes    from './uploadRoutes.js';
 import settingRoutes   from './settingRoutes.js';
+import paymentRoutes   from './paymentRoutes.js';
 
 const router = Router();
 
 router.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
 router.use('/auth',       authRoutes);
+router.use('/users',      userRoutes);
 router.use('/products',   productRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/cart',       cartRoutes);
@@ -34,5 +37,6 @@ router.use('/reports',    reportRoutes);
 router.use('/enquiries',  enquiryRoutes);
 router.use('/uploads',    uploadRoutes);
 router.use('/settings',   settingRoutes);
+router.use('/payments',   paymentRoutes);
 
 export default router;

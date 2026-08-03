@@ -1,8 +1,9 @@
 import { sendSuccess, sendError } from '../utils/response.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
+import prisma from '../config/db.js';
 
-// In-memory store initialized with demo enquiries
-let enquiries = [
+// In-memory store fallback initialized with demo enquiries
+let fallbackEnquiries = [
   {
     id: 'enq-101',
     name: 'Tech Solutions Pvt. Ltd.',
@@ -37,41 +38,105 @@ let enquiries = [
 
 export const enquiryController = {
   // Public: Submit enquiry from contact form
-  createEnquiry: (req, res) => {
-    const { name, email, phone, subject, message } = req.body;
-    if (!name || !email || !message) {
-      return sendError(res, 'Name, email, and message are required', HTTP_STATUS.BAD_REQUEST);
+  createEnquiry: async (req, res) => {
+    try {
+      const { name, email, phone, subject, message } = req.body;
+      if (!name || !email || !message) {
+        return sendError(res, 'Name, email, and message are required', HTTP_STATUS.BAD_REQUEST);
+      }
+
+      let newEnquiry;
+      try {
+        if (prisma.enquiry) {
+          newEnquiry = await prisma.enquiry.create({
+            data: {
+              name,
+              email,
+              phone: phone || 'N/A',
+              subject: subject || 'General Inquiry',
+              message,
+              status: 'New',
+            },
+          });
+        }
+      } catch (dbErr) {
+        console.warn('Prisma enquiry save fallback to memory:', dbErr.message);
+      }
+
+      if (!newEnquiry) {
+        newEnquiry = {
+          id: `enq-${Date.now()}`,
+          name,
+          email,
+          phone: phone || 'N/A',
+          subject: subject || 'General Inquiry',
+          message,
+          status: 'New',
+          createdAt: new Date().toISOString(),
+        };
+        fallbackEnquiries.unshift(newEnquiry);
+      }
+
+      return sendSuccess(res, newEnquiry, 'Enquiry submitted successfully', HTTP_STATUS.CREATED);
+    } catch (err) {
+      return sendError(res, err.message || 'Failed to submit enquiry', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
-
-    const newEnquiry = {
-      id: `enq-${Date.now()}`,
-      name,
-      email,
-      phone: phone || 'N/A',
-      subject: subject || 'General Inquiry',
-      message,
-      status: 'New',
-      createdAt: new Date().toISOString(),
-    };
-
-    enquiries.unshift(newEnquiry);
-    sendSuccess(res, newEnquiry, 'Enquiry submitted successfully', HTTP_STATUS.CREATED);
   },
 
   // Admin/SuperAdmin: Get all enquiries
-  getAllEnquiries: (req, res) => {
-    sendSuccess(res, enquiries, 'Enquiries fetched successfully');
+  getAllEnquiries: async (req, res) => {
+    try {
+      let enquiriesList = [];
+      try {
+        if (prisma.enquiry) {
+          enquiriesList = await prisma.enquiry.findMany({
+            orderBy: { createdAt: 'desc' },
+          });
+        }
+      } catch (dbErr) {
+        console.warn('Prisma fetch enquiries fallback to memory:', dbErr.message);
+      }
+
+      if (!enquiriesList || enquiriesList.length === 0) {
+        enquiriesList = fallbackEnquiries;
+      }
+
+      return sendSuccess(res, enquiriesList, 'Enquiries fetched successfully');
+    } catch (err) {
+      return sendError(res, err.message || 'Failed to fetch enquiries', HTTP_STATUS.INTERNAL_SERVER_ERROR);
+    }
   },
 
   // Admin/SuperAdmin: Update enquiry status
-  updateStatus: (req, res) => {
-    const { id } = req.params;
-    const { status } = req.body;
-    const item = enquiries.find((e) => e.id === id);
-    if (!item) {
-      return sendError(res, 'Enquiry not found', HTTP_STATUS.NOT_FOUND);
+  updateStatus: async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+
+      let updated;
+      try {
+        if (prisma.enquiry) {
+          updated = await prisma.enquiry.update({
+            where: { id },
+            data: { status },
+          });
+        }
+      } catch (dbErr) {
+        console.warn('Prisma enquiry update fallback to memory:', dbErr.message);
+      }
+
+      if (!updated) {
+        const item = fallbackEnquiries.find((e) => e.id === id);
+        if (!item) {
+          return sendError(res, 'Enquiry not found', HTTP_STATUS.NOT_FOUND);
+        }
+        item.status = status || item.status;
+        updated = item;
+      }
+
+      return sendSuccess(res, updated, 'Enquiry status updated');
+    } catch (err) {
+      return sendError(res, err.message || 'Failed to update enquiry status', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
-    item.status = status || item.status;
-    sendSuccess(res, item, 'Enquiry status updated');
   },
 };
