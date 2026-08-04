@@ -97,6 +97,14 @@ export const authService = {
       throw err;
     }
 
+    // Validate strong password
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    if (!passwordRegex.test(password)) {
+      const err = new Error('Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, one number, and one special character.');
+      err.statusCode = HTTP_STATUS.BAD_REQUEST;
+      throw err;
+    }
+
     // Hash Password & Create User Record in Database NOW
     const hashedPassword = await bcrypt.hash(password, 12);
 
