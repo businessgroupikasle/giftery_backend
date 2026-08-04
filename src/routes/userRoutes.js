@@ -11,12 +11,11 @@ router.get('/', authenticate, async (req, res, next) => {
     const { role, limit = 500, page = 1 } = req.query;
     const skip = (Number(page) - 1) * Number(limit);
 
-    const where = { isEmailVerified: true };
-    if (role) {
+    const where = {};
+    if (role && role !== 'ALL') {
       where.role = role.toUpperCase();
     } else {
-      // By default return all non-admin users
-      where.role = { in: ['USER'] };
+      where.role = { in: ['USER', 'CUSTOMER'] };
     }
 
     const [users, total] = await Promise.all([
@@ -35,12 +34,31 @@ router.get('/', authenticate, async (req, res, next) => {
           isActive: true,
           isEmailVerified: true,
           createdAt: true,
+          orders: {
+            select: {
+              id: true,
+              totalAmount: true,
+            },
+          },
         },
       }),
       prisma.user.count({ where }),
     ]);
 
-    sendSuccess(res, { users, total, page: Number(page), limit: Number(limit) });
+    const formattedUsers = users.map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone || 'Not provided',
+      role: u.role || 'CUSTOMER',
+      ordersCount: u.orders?.length || 0,
+      totalSpent: u.orders?.reduce((sum, o) => sum + (o.totalAmount || 0), 0) || 0,
+      joinedDate: u.createdAt ? new Date(u.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Recent',
+      status: u.isActive ? 'Active' : 'Inactive',
+      createdAt: u.createdAt,
+    }));
+
+    sendSuccess(res, { users: formattedUsers, total, page: Number(page), limit: Number(limit) });
   } catch (err) {
     next(err);
   }

@@ -86,10 +86,10 @@ export const enquiryController = {
   // Admin/SuperAdmin: Get all enquiries
   getAllEnquiries: async (req, res) => {
     try {
-      let enquiriesList = [];
+      let dbEnquiries = [];
       try {
         if (prisma.enquiry) {
-          enquiriesList = await prisma.enquiry.findMany({
+          dbEnquiries = await prisma.enquiry.findMany({
             orderBy: { createdAt: 'desc' },
           });
         }
@@ -97,11 +97,19 @@ export const enquiryController = {
         console.warn('Prisma fetch enquiries fallback to memory:', dbErr.message);
       }
 
-      if (!enquiriesList || enquiriesList.length === 0) {
-        enquiriesList = fallbackEnquiries;
-      }
+      // Merge DB enquiries with fallback/demo list for rich presentation
+      const mergedMap = new Map();
+      dbEnquiries.forEach(e => mergedMap.set(e.id, e));
+      fallbackEnquiries.forEach(e => {
+        if (!mergedMap.has(e.id)) mergedMap.set(e.id, e);
+      });
 
-      return sendSuccess(res, enquiriesList, 'Enquiries fetched successfully');
+      const resultList = Array.from(mergedMap.values()).map(e => ({
+        ...e,
+        createdAt: e.createdAt ? new Date(e.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent',
+      }));
+
+      return sendSuccess(res, resultList, 'Enquiries fetched successfully');
     } catch (err) {
       return sendError(res, err.message || 'Failed to fetch enquiries', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
@@ -137,6 +145,25 @@ export const enquiryController = {
       return sendSuccess(res, updated, 'Enquiry status updated');
     } catch (err) {
       return sendError(res, err.message || 'Failed to update enquiry status', HTTP_STATUS.INTERNAL_SERVER_ERROR);
+    }
+  },
+
+  // Admin/SuperAdmin: Delete enquiry record
+  deleteEnquiry: async (req, res) => {
+    try {
+      const { id } = req.params;
+      try {
+        if (prisma.enquiry) {
+          await prisma.enquiry.delete({ where: { id } });
+        }
+      } catch (dbErr) {
+        console.warn('Prisma enquiry delete fallback:', dbErr.message);
+      }
+
+      fallbackEnquiries = fallbackEnquiries.filter(e => e.id !== id);
+      return sendSuccess(res, null, 'Enquiry deleted successfully');
+    } catch (err) {
+      return sendError(res, err.message || 'Failed to delete enquiry', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
   },
 };

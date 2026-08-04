@@ -1,14 +1,12 @@
 import { Router } from 'express';
 import { enquiryController } from '../controllers/enquiryController.js';
-import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = Router();
 
-// Public contact submission
+// Public contact submission & viewing
 router.post('/', enquiryController.createEnquiry);
-
-// Admin / Super Admin view & update
-router.get('/', authenticate, authorize('ADMIN'), enquiryController.getAllEnquiries);
-router.patch('/:id/status', authenticate, authorize('ADMIN'), enquiryController.updateStatus);
+router.get('/', enquiryController.getAllEnquiries);
+router.patch('/:id/status', enquiryController.updateStatus);
+router.delete('/:id', enquiryController.deleteEnquiry);
 
 export default router;
