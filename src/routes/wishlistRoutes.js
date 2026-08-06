@@ -46,4 +46,15 @@ router.delete('/:productId', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// DELETE /api/v1/wishlist (Clear all)
+router.delete('/', async (req, res, next) => {
+  try {
+    const wishlist = await prisma.wishlist.findUnique({ where: { userId: req.user.id } });
+    if (wishlist) {
+      await prisma.wishlistItem.deleteMany({ where: { wishlistId: wishlist.id } });
+    }
+    sendSuccess(res, null, 'Wishlist cleared');
+  } catch (err) { next(err); }
+});
+
 export default router;
