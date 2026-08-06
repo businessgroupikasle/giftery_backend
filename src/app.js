@@ -42,8 +42,16 @@ app.use(globalLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
+import fs from 'fs';
+
 // ── Static Files (Uploads) ─────────────────────────────────────
-app.use('/uploads', express.static(path.join(__dirname, '..', env.UPLOAD_DIR)));
+const uploadPath = path.isAbsolute(env.UPLOAD_DIR)
+  ? env.UPLOAD_DIR
+  : path.resolve(process.cwd(), env.UPLOAD_DIR);
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
+}
+app.use('/uploads', express.static(uploadPath));
 
 // ── API Routes ──────────────────────────────────────────────────
 app.use('/api/v1', apiRoutes);

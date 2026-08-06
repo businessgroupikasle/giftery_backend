@@ -5,14 +5,22 @@ import { env } from '../config/env.js';
 import { sendError } from '../utils/response.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
 
+const getUploadDir = () => {
+  return path.isAbsolute(env.UPLOAD_DIR)
+    ? env.UPLOAD_DIR
+    : path.resolve(process.cwd(), env.UPLOAD_DIR);
+};
+
 // Ensure upload directory exists
-if (!fs.existsSync(env.UPLOAD_DIR)) {
-  fs.mkdirSync(env.UPLOAD_DIR, { recursive: true });
+const targetDir = getUploadDir();
+if (!fs.existsSync(targetDir)) {
+  fs.mkdirSync(targetDir, { recursive: true });
 }
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    const subDir = path.join(env.UPLOAD_DIR, req.uploadDir || 'misc');
+    const baseDir = getUploadDir();
+    const subDir = req.uploadDir ? path.join(baseDir, req.uploadDir) : baseDir;
     fs.mkdirSync(subDir, { recursive: true });
     cb(null, subDir);
   },
