@@ -41,7 +41,8 @@ export const authorize = (...roles) => {
       return sendError(res, 'Not authenticated', HTTP_STATUS.UNAUTHORIZED);
     }
     const userRole = req.user.role;
-    const hasPermission = roles.includes(userRole) || (userRole === 'SUPER_ADMIN' && roles.includes('ADMIN'));
+    const isSuperOrAdmin = userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || userRole === 'STORE_ADMIN';
+    const hasPermission = roles.includes(userRole) || (isSuperOrAdmin && (roles.includes('ADMIN') || roles.includes('VENDOR')));
     if (!hasPermission) {
       return sendError(res, 'Access forbidden: insufficient permissions', HTTP_STATUS.FORBIDDEN);
     }

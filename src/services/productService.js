@@ -2,6 +2,7 @@ import { productRepository } from '../repositories/productRepository.js';
 import { paginate } from '../utils/pagination.js';
 import { slugify } from '../utils/slugify.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
+import prisma from '../config/db.js';
 
 const sortMap = {
   price_asc: { price: 'asc' },
@@ -49,6 +50,22 @@ export const productService = {
     const slug = slugify(data.name);
     const existing = await productRepository.existsBySlug(slug);
     const finalSlug = existing ? `${slug}-${Date.now()}` : slug;
+
+    if (data.categoryId) {
+      const catExists = await prisma.category.findUnique({ where: { id: data.categoryId } });
+      if (!catExists) {
+        const fallbackCat = await prisma.category.findFirst();
+        if (fallbackCat) {
+          data.categoryId = fallbackCat.id;
+        } else {
+          const newCat = await prisma.category.create({
+            data: { name: 'General Gifts', slug: 'general-gifts', description: 'General Store Gifts' }
+          });
+          data.categoryId = newCat.id;
+        }
+      }
+    }
+
     return productRepository.create({ ...data, slug: finalSlug });
   },
 
@@ -63,6 +80,12 @@ export const productService = {
       const newSlug = slugify(data.name);
       const existing = await productRepository.existsBySlug(newSlug, id);
       data.slug = existing ? `${newSlug}-${Date.now()}` : newSlug;
+    }
+    if (data.categoryId) {
+      const catExists = await prisma.category.findUnique({ where: { id: data.categoryId } });
+      if (!catExists) {
+        delete data.categoryId;
+      }
     }
     return productRepository.update(id, data);
   },

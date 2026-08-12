@@ -109,11 +109,23 @@ model Product {
   images       String[]
   sku          String?  @unique
   weight       Float?
-  featured     Boolean  @default(false)
-  isActive     Boolean  @default(true)
-  categoryId   String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  featured         Boolean  @default(false)
+  isBestseller     Boolean  @default(false)
+  isPopular        Boolean  @default(false)
+  isNewArrival     Boolean  @default(false)
+  isMostLoved      Boolean  @default(false)
+  isGiftSet        Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  categoryId       String
+  subCategoryId    String?
+  specifications   String?
+  customization    String?
+  shippingReturns  String?
+  tags             String[] @default([])
+  rating           Float    @default(4.8)
+  reviewsCount     Int      @default(128)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   category      Category     @relation(fields: [categoryId], references: [id])
   orderItems    OrderItem[]
