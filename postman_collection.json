@@ -1,0 +1,566 @@
+{
+  "info": {
+    "name": "E-Commerce Product Management API",
+    "description": "Complete collection for product CRUD, uploads, and dashboard operations",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Upload Endpoints",
+      "item": [
+        {
+          "name": "Single Image Upload",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": "<your-image-path>"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/upload",
+              "host": ["{{base_url}}"],
+              "path": ["upload"]
+            }
+          }
+        },
+        {
+          "name": "Multiple Images Upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "<your-image-path-1>"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": "<your-image-path-2>"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/upload/multiple",
+              "host": ["{{base_url}}"],
+              "path": ["upload", "multiple"]
+            }
+          }
+        },
+        {
+          "name": "Delete File",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/upload/product-1723456789-123456.jpg",
+              "host": ["{{base_url}}"],
+              "path": ["upload", "product-1723456789-123456.jpg"]
+            }
+          }
+        },
+        {
+          "name": "Validate Image URL",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/upload/validate//uploads/product-1723456789-123456.jpg",
+              "host": ["{{base_url}}"],
+              "path": ["upload", "validate", "/uploads/product-1723456789-123456.jpg"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Product Dashboard",
+      "item": [
+        {
+          "name": "Get Product Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/stats",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get All Products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/products?page=1&limit=20&search=&categoryId=&status=active&stock=&sort=newest",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                },
+                {
+                  "key": "categoryId",
+                  "value": ""
+                },
+                {
+                  "key": "status",
+                  "value": "active"
+                },
+                {
+                  "key": "stock",
+                  "value": ""
+                },
+                {
+                  "key": "sort",
+                  "value": "newest"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Product By ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/:id",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Premium Gift Box\",\n  \"description\": \"Beautiful premium gift box for special occasions\",\n  \"price\": 29.99,\n  \"comparePrice\": 39.99,\n  \"stock\": 50,\n  \"images\": [\"/uploads/product-img1.jpg\"],\n  \"sku\": \"GIFT-BOX-001\",\n  \"weight\": 0.5,\n  \"featured\": true,\n  \"isBestseller\": false,\n  \"isPopular\": true,\n  \"isNewArrival\": true,\n  \"isMostLoved\": false,\n  \"isGiftSet\": true,\n  \"isActive\": true,\n  \"categoryId\": \"cat123\",\n  \"subCategoryId\": null,\n  \"specifications\": \"100% premium material, eco-friendly\",\n  \"customization\": \"Personalization available\",\n  \"shippingReturns\": \"Free shipping, 30-day returns\",\n  \"tags\": [\"premium\", \"gift\", \"seasonal\"],\n  \"rating\": 4.8,\n  \"reviewsCount\": 128\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/dashboard/products",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products"]
+            }
+          }
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Gift Box\",\n  \"price\": 34.99,\n  \"stock\": 45,\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/:id",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/:id",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Product Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/:id/status",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", ":id", "status"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Inventory",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 100\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/:id/inventory",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", ":id", "inventory"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Clone Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/:id/clone",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", ":id", "clone"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bulk Operations",
+      "item": [
+        {
+          "name": "Bulk Update Status",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\"id1\", \"id2\", \"id3\"],\n  \"isActive\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/batch/status",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", "batch", "status"]
+            }
+          }
+        },
+        {
+          "name": "Bulk Delete",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\"id1\", \"id2\", \"id3\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/batch/delete",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", "batch", "delete"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Inventory Reports",
+      "item": [
+        {
+          "name": "Low Stock Products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/stock/low?page=1&limit=20&threshold=10",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", "stock", "low"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "threshold",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Out of Stock Products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/stock/outofstock?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", "stock", "outofstock"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Products by Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/status/active?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", "status", "active"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Top Selling Products",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dashboard/products/top-selling?days=30&limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["dashboard", "products", "top-selling"],
+              "query": [
+                {
+                  "key": "days",
+                  "value": "30"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
