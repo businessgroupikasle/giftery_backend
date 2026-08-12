@@ -2,6 +2,7 @@ import { productRepository } from '../repositories/productRepository.js';
 import { paginate } from '../utils/pagination.js';
 import { slugify } from '../utils/slugify.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
+import { fileUploadHelper } from '../helpers/fileUpload.js';
 import prisma from '../config/db.js';
 
 const sortMap = {
@@ -97,6 +98,53 @@ export const productService = {
       err.statusCode = HTTP_STATUS.NOT_FOUND;
       throw err;
     }
-    return productRepository.delete(id);
+
+    const deleteResult = await productRepository.delete(id);
+
+    if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+      const cleanupResult = fileUploadHelper.deleteImagesByUrls(product.images);
+      if (cleanupResult.failed.length > 0) {
+        console.warn(`Failed to delete ${cleanupResult.failed.length} images for product ${id}:`, cleanupResult.failed);
+      }
+    }
+
+    return deleteResult;
+  },
+
+  validateImages: async (imageUrls = []) => {
+    if (!Array.isArray(imageUrls)) return false;
+    if (imageUrls.length === 0) return false;
+    return imageUrls.every(url => fileUploadHelper.validateImageUrl(url));
+  },
+
+  updateWithImages: async (id, data) => {
+    const product = await productRepository.findById(id);
+    if (!product) {
+      const err = new Error('Product not found');
+      err.statusCode = HTTP_STATUS.NOT_FOUND;
+      throw err;
+    }
+
+    if (data.images && Array.isArray(data.images) && data.images.length > 0) {
+      const isValid = await productService.validateImages(data.images);
+      if (!isValid) {
+        const err = new Error('One or more image URLs are invalid or files do not exist');
+        err.statusCode = HTTP_STATUS.BAD_REQUEST;
+        throw err;
+      }
+
+      const oldImages = product.images || [];
+      const newImages = data.images || [];
+      const imagesToDelete = oldImages.filter(img => !newImages.includes(img));
+
+      if (imagesToDelete.length > 0) {
+        const cleanupResult = fileUploadHelper.deleteImagesByUrls(imagesToDelete);
+        if (cleanupResult.failed.length > 0) {
+          console.warn(`Failed to delete ${cleanupResult.failed.length} old images:`, cleanupResult.failed);
+        }
+      }
+    }
+
+    return productService.update(id, data);
   },
 };
