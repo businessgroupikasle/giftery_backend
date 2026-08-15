@@ -14,6 +14,7 @@ import cmsRoutes       from './cmsRoutes.js';
 import reportRoutes    from './reportRoutes.js';
 import enquiryRoutes   from './enquiryRoutes.js';
 import uploadRoutes    from './uploadRoutes.js';
+import addressRoutes  from './addressRoutes.js';
 import settingRoutes   from './settingRoutes.js';
 import paymentRoutes   from './paymentRoutes.js';
 
@@ -23,6 +24,7 @@ router.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date
 
 router.use('/auth',       authRoutes);
 router.use('/users',      userRoutes);
+router.use('/addresses',  addressRoutes);
 router.use('/products',   productRoutes);
 router.use('/categories', categoryRoutes);
 router.use('/cart',       cartRoutes);

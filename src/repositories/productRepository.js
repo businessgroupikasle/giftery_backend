@@ -26,7 +26,7 @@ const productSelect = {
   tags: true,
   rating: true,
   reviewsCount: true,
-  category: { select: { id: true, name: true, slug: true } },
+  category: { select: { id: true, name: true, slug: true, parentId: true } },
   createdAt: true,
   updatedAt: true,
   _count: { select: { reviews: true } },

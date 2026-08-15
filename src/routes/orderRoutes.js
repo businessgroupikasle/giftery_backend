@@ -14,5 +14,7 @@ router.get('/',     authorize('ADMIN'), orderController.getAllOrders);
 router.get('/:id',  orderController.getById);
 router.post('/',    validate(createOrderSchema), orderController.createOrder);
 router.patch('/:id/status', authorize('ADMIN'), validate(updateOrderStatusSchema), orderController.updateStatus);
+router.put('/:id/status',   authorize('ADMIN'), validate(updateOrderStatusSchema), orderController.updateStatus);
+router.put('/:id',          authorize('ADMIN'), validate(updateOrderStatusSchema), orderController.updateStatus);
 
 export default router;

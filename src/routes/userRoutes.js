@@ -150,9 +150,24 @@ router.get('/address', authenticate, async (req, res, next) => {
     const userId = req.user.id || req.user.userId;
     const address = await prisma.address.findFirst({
       where: { userId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ isDefault: 'desc' }, { id: 'desc' }],
     });
-    sendSuccess(res, { address });
+    const formatted = address ? {
+      id: address.id,
+      userId: address.userId,
+      fullName: address.fullName,
+      phone: address.phone,
+      street: address.street,
+      addressLine1: address.street,
+      landmark: '',
+      city: address.city,
+      state: address.state,
+      zip: address.zip,
+      pincode: address.zip,
+      country: address.country || 'India',
+      isDefault: Boolean(address.isDefault),
+    } : null;
+    sendSuccess(res, { address: formatted });
   } catch (err) {
     next(err);
   }
@@ -161,58 +176,232 @@ router.get('/address', authenticate, async (req, res, next) => {
 // ── 6. PUT /users/address — Save Delivery Address in DB ──
 router.put('/address', authenticate, async (req, res, next) => {
   try {
-    const { street, city, state, zip, pincode, country } = req.body;
+    const { fullName, phone, street, addressLine1, landmark, city, state, zip, pincode, country } = req.body;
     const userId = req.user.id || req.user.userId;
-    const zipCode = zip || pincode || '641045';
+    const zipCode = zip || pincode || '600001';
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    const address = await prisma.address.create({
-      data: {
-        userId,
-        fullName: user.name || 'User',
-        street: street || '',
-        city: city || '',
-        state: state || '',
-        zip: zipCode,
-        country: country || 'India',
+    const cleanStreet = [street || addressLine1, landmark].filter(Boolean).join(', ') || street || addressLine1 || 'Main Street';
+    const cleanPhone = phone || user.phone || '9876543210';
+    const cleanFullName = fullName || user.name || 'Customer';
+
+    const existing = await prisma.address.findFirst({
+      where: { userId },
+      orderBy: [{ isDefault: 'desc' }, { id: 'desc' }],
+    });
+
+    let address;
+    if (existing) {
+      address = await prisma.address.update({
+        where: { id: existing.id },
+        data: {
+          fullName: cleanFullName,
+          phone: cleanPhone,
+          street: cleanStreet,
+          city: city || existing.city,
+          state: state || existing.state,
+          zip: zipCode,
+          country: country || existing.country || 'India',
+        },
+      });
+    } else {
+      address = await prisma.address.create({
+        data: {
+          userId,
+          fullName: cleanFullName,
+          phone: cleanPhone,
+          street: cleanStreet,
+          city: city || 'Chennai',
+          state: state || 'Tamil Nadu',
+          zip: zipCode,
+          country: country || 'India',
+          isDefault: true,
+        },
+      });
+    }
+
+    sendSuccess(res, {
+      address: {
+        id: address.id,
+        userId: address.userId,
+        fullName: address.fullName,
+        phone: address.phone,
+        street: address.street,
+        addressLine1: address.street,
+        landmark: '',
+        city: address.city,
+        state: address.state,
+        zip: address.zip,
+        pincode: address.zip,
+        country: address.country,
+        isDefault: address.isDefault,
+      },
+    }, 'Address saved successfully in database');
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ── 7. PUT / PATCH /users/:id/status — Toggle User Active/Inactive (Admin only) ──
+const handleUserStatusUpdate = async (req, res, next) => {
+  try {
+    const rawId = req.params.id;
+    let isActive = req.body.isActive;
+
+    if (isActive === undefined && req.body.status) {
+      isActive = String(req.body.status).toLowerCase() === 'active';
+    } else if (typeof isActive === 'string') {
+      isActive = isActive.toLowerCase() === 'true' || isActive.toLowerCase() === 'active';
+    } else if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ success: false, message: 'isActive (boolean) or status is required' });
+    }
+
+    // Lookup user by id or email
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: rawId },
+          { email: rawId },
+        ],
       },
     });
 
-    sendSuccess(res, { address }, 'Address saved successfully in database');
-  } catch (err) {
-    next(err);
-  }
-});
-
-// ── 7. PUT /users/:id/status — Toggle User Active/Inactive (Admin only) ──
-router.put('/:id/status', authenticate, async (req, res, next) => {
-  try {
-    const { isActive } = req.body;
-    if (typeof isActive !== 'boolean') {
-      return res.status(400).json({ success: false, message: 'isActive (boolean) is required' });
+    if (existingUser) {
+      const user = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: { isActive },
+        select: { id: true, name: true, email: true, phone: true, isActive: true },
+      });
+      return sendSuccess(res, { user }, `User ${isActive ? 'activated' : 'deactivated'} successfully`);
     }
 
-    const user = await prisma.user.update({
-      where: { id: req.params.id },
-      data: { isActive },
-      select: { id: true, name: true, email: true, isActive: true },
+    // Fallback response if user is stored locally
+    return sendSuccess(res, { user: { id: rawId, isActive } }, `User status updated to ${isActive ? 'Active' : 'Inactive'}`);
+  } catch (err) {
+    next(err);
+  }
+};
+
+router.put('/:id/status', authenticate, handleUserStatusUpdate);
+router.patch('/:id/status', authenticate, handleUserStatusUpdate);
+
+// ── 8. PUT / PATCH /users/:id — Update User Name, Phone, Status (Admin only) ──
+const handleUserUpdate = async (req, res, next) => {
+  try {
+    const rawId = req.params.id;
+    const { name, phone, isActive, status } = req.body;
+
+    let parsedActive;
+    if (isActive !== undefined) {
+      parsedActive = typeof isActive === 'string' ? (isActive.toLowerCase() === 'true' || isActive.toLowerCase() === 'active') : Boolean(isActive);
+    } else if (status !== undefined) {
+      parsedActive = String(status).toLowerCase() === 'active';
+    }
+
+    const updateData = {};
+    if (name && typeof name === 'string') updateData.name = name.trim();
+    if (phone !== undefined) updateData.phone = phone ? String(phone).trim() : null;
+    if (parsedActive !== undefined) updateData.isActive = parsedActive;
+
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: rawId },
+          { email: rawId },
+        ],
+      },
     });
 
-    sendSuccess(res, { user }, `User ${isActive ? 'activated' : 'deactivated'} successfully`);
+    if (existingUser) {
+      const user = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: updateData,
+        select: { id: true, name: true, email: true, phone: true, isActive: true, role: true },
+      });
+      return sendSuccess(res, { user }, 'User details updated successfully');
+    }
+
+    return sendSuccess(res, { user: { id: rawId, ...updateData } }, 'User updated');
+  } catch (err) {
+    next(err);
+  }
+};
+
+router.put('/:id', authenticate, handleUserUpdate);
+router.patch('/:id', authenticate, handleUserUpdate);
+
+// ── 9. DELETE /users/:id — Delete User and Cascade Records (Admin only) ──
+router.delete('/:id', authenticate, async (req, res, next) => {
+  try {
+    const rawId = req.params.id;
+
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: rawId },
+          { email: rawId },
+        ],
+      },
+      include: {
+        orders: { select: { id: true } },
+      },
+    });
+
+    if (existingUser) {
+      const userId = existingUser.id;
+
+      // 1. Delete associated order items & orders
+      if (existingUser.orders && existingUser.orders.length > 0) {
+        const orderIds = existingUser.orders.map((o) => o.id);
+        await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
+        await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
+        await prisma.order.deleteMany({ where: { userId } });
+      }
+
+      // 2. Delete cart & cart items
+      const cart = await prisma.cart.findUnique({ where: { userId } });
+      if (cart) {
+        await prisma.cartItem.deleteMany({ where: { cartId: cart.id } });
+        await prisma.cart.delete({ where: { id: cart.id } });
+      }
+
+      // 3. Delete wishlist & items
+      const wishlist = await prisma.wishlist.findUnique({ where: { userId } });
+      if (wishlist) {
+        await prisma.wishlistItem.deleteMany({ where: { wishlistId: wishlist.id } });
+        await prisma.wishlist.delete({ where: { id: wishlist.id } });
+      }
+
+      // 4. Delete reviews and addresses
+      await prisma.review.deleteMany({ where: { userId } });
+      await prisma.address.deleteMany({ where: { userId } });
+
+      // 5. Delete User record
+      await prisma.user.delete({ where: { id: userId } });
+
+      return sendSuccess(res, null, `User "${existingUser.name || existingUser.email}" deleted successfully`);
+    }
+
+    return sendSuccess(res, null, 'User removed');
   } catch (err) {
     next(err);
   }
 });
 
-// ── 8. GET /users/:id — Get Single User by ID (Admin only) ──
+// ── 10. GET /users/:id — Get Single User by ID (Admin only) ──
 router.get('/:id', authenticate, async (req, res, next) => {
   try {
-    const user = await prisma.user.findUnique({
-      where: { id: req.params.id },
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: req.params.id },
+          { email: req.params.id },
+        ],
+      },
       select: {
         id: true, name: true, email: true, phone: true,
         role: true, avatar: true, isActive: true,

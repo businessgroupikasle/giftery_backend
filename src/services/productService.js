@@ -83,7 +83,9 @@ const sanitizeProductData = (inputData = {}) => {
   delete data.updatedAt;
 
   // Clean empty strings for optional relation/string fields
-  if (!data.subCategoryId) delete data.subCategoryId;
+  if (data.subCategoryId !== undefined) {
+    data.subCategoryId = data.subCategoryId ? String(data.subCategoryId).trim() : null;
+  }
   if (!data.sku) delete data.sku;
   if (data.specifications && typeof data.specifications === 'object') {
     data.specifications = JSON.stringify(data.specifications);
@@ -172,8 +174,10 @@ export const productService = {
     if (data.subCategoryId) {
       const subExists = await prisma.category.findUnique({ where: { id: data.subCategoryId } });
       if (!subExists) {
-        delete data.subCategoryId;
+        data.subCategoryId = null;
       }
+    } else {
+      data.subCategoryId = null;
     }
 
     return productRepository.create(data);
@@ -205,10 +209,14 @@ export const productService = {
         delete data.categoryId;
       }
     }
-    if (data.subCategoryId) {
-      const subExists = await prisma.category.findUnique({ where: { id: data.subCategoryId } });
-      if (!subExists) {
-        delete data.subCategoryId;
+    if (data.subCategoryId !== undefined) {
+      if (data.subCategoryId) {
+        const subExists = await prisma.category.findUnique({ where: { id: data.subCategoryId } });
+        if (!subExists) {
+          data.subCategoryId = null;
+        }
+      } else {
+        data.subCategoryId = null;
       }
     }
     return productRepository.update(targetId, data);

@@ -187,7 +187,8 @@ async function main() {
         images: ['https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&auto=format&fit=crop&q=80'],
         sku: 'CORP-GYRO-001',
         featured: true,
-        categoryId: corpSubCategoryMap['onboarding-kit']?.id || corporateGifts.id,
+        categoryId: corporateGifts.id,
+        subCategoryId: corpSubCategoryMap['onboarding-kit']?.id,
       },
     }),
     prisma.product.create({
@@ -201,7 +202,8 @@ async function main() {
         images: ['https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=800&auto=format&fit=crop&q=80'],
         sku: 'CORP-CLK-002',
         featured: true,
-        categoryId: corpSubCategoryMap['work-anniversary-kit']?.id || corporateGifts.id,
+        categoryId: corporateGifts.id,
+        subCategoryId: corpSubCategoryMap['work-anniversary-kit']?.id,
       },
     }),
     prisma.product.create({
@@ -215,7 +217,8 @@ async function main() {
         images: ['https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800&auto=format&fit=crop&q=80'],
         sku: 'CORP-DRINK-003',
         featured: true,
-        categoryId: corpSubCategoryMap['drinkware']?.id || corporateGifts.id,
+        categoryId: corporateGifts.id,
+        subCategoryId: corpSubCategoryMap['drinkware']?.id,
       },
     }),
 
@@ -231,7 +234,8 @@ async function main() {
         images: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80'],
         sku: 'PERS-NOTE-001',
         featured: true,
-        categoryId: persSubCategoryMap['wooden-photo-engraving']?.id || personalizedGifts.id,
+        categoryId: personalizedGifts.id,
+        subCategoryId: persSubCategoryMap['wooden-photo-engraving']?.id,
       },
     }),
     prisma.product.create({
@@ -245,7 +249,8 @@ async function main() {
         images: ['https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=800&auto=format&fit=crop&q=80'],
         sku: 'PERS-ACRY-002',
         featured: true,
-        categoryId: persSubCategoryMap['acrylic-frames']?.id || personalizedGifts.id,
+        categoryId: personalizedGifts.id,
+        subCategoryId: persSubCategoryMap['acrylic-frames']?.id,
       },
     }),
 
@@ -261,7 +266,8 @@ async function main() {
         images: ['https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800&auto=format&fit=crop&q=80'],
         sku: 'TOYS-RC-001',
         featured: true,
-        categoryId: toysSubCategoryMap['remote-control-toys']?.id || toys.id,
+        categoryId: toys.id,
+        subCategoryId: toysSubCategoryMap['remote-control-toys']?.id,
       },
     }),
     prisma.product.create({
@@ -275,7 +281,8 @@ async function main() {
         images: ['https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&auto=format&fit=crop&q=80'],
         sku: 'TOYS-STEM-002',
         featured: true,
-        categoryId: toysSubCategoryMap['building-blocks']?.id || toys.id,
+        categoryId: toys.id,
+        subCategoryId: toysSubCategoryMap['building-blocks']?.id,
       },
     }),
   ]);
