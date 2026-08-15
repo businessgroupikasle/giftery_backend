@@ -36,6 +36,7 @@ router.use('/cms',        cmsRoutes);
 router.use('/reports',    reportRoutes);
 router.use('/enquiries',  enquiryRoutes);
 router.use('/uploads',    uploadRoutes);
+router.use('/upload',     uploadRoutes);
 router.use('/settings',   settingRoutes);
 router.use('/payments',   paymentRoutes);
 

@@ -23,11 +23,17 @@ export const fileUploadHelper = {
 
   validateImageUrl: (url) => {
     if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return true;
+    if (trimmed.startsWith('data:image/')) return true;
+    if (trimmed.startsWith('/images/') || trimmed.startsWith('/placeholder')) return true;
+
     const uploadDir = getUploadDir();
-    const fullPath = path.join(uploadDir, url.split('/uploads/')[1] || '');
+    const subPath = trimmed.includes('/uploads/') ? trimmed.split('/uploads/')[1] : trimmed;
+    const fullPath = path.join(uploadDir, subPath || '');
     const normalizedPath = path.normalize(fullPath);
     const normalizedUploadDir = path.normalize(uploadDir);
-    return normalizedPath.startsWith(normalizedUploadDir) && fs.existsSync(normalizedPath);
+    return normalizedPath.startsWith(normalizedUploadDir);
   },
 
   validateImageUrls: (urls = []) => {
