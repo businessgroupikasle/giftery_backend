@@ -48,3 +48,27 @@ export const upload = multer({
   limits: { fileSize: env.MAX_FILE_SIZE },
   fileFilter,
 });
+
+export const uploadExcel = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB limit for bulk import files / ZIPs with images
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (
+      ['.xlsx', '.xls', '.csv', '.zip'].includes(ext) ||
+      file.mimetype.includes('spreadsheet') ||
+      file.mimetype.includes('excel') ||
+      file.mimetype.includes('csv') ||
+      file.mimetype.includes('zip') ||
+      file.mimetype === 'application/octet-stream' ||
+      file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ) {
+      cb(null, true);
+    } else {
+      cb(
+        Object.assign(new Error('Please upload a valid Excel (.xlsx, .xls) or ZIP file (.zip)'), { statusCode: 400 }),
+        false
+      );
+    }
+  },
+});
