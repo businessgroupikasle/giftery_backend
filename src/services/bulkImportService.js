@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import AdmZip from 'adm-zip';
 import prisma from '../config/db.js';
 import { env } from '../config/env.js';
+import { slugify } from '../utils/slugify.js';
 import { productService } from './productService.js';
 
 const getUploadDir = () => {
@@ -435,13 +436,13 @@ export const bulkImportService = {
         }
       }
 
-      // 6. Category Mapping
+      // 6. Category Mapping — Resilient matching & Auto-Creation support
       const rawMainCat = String(row['Main Category'] || row['Category'] || row['category'] || '').trim();
       const rawSubCat = String(row['Subcategory'] || row['Sub Category'] || row['subcategory'] || '').trim();
       let matchedCategoryId = null;
-      let matchedCategoryName = '';
+      let matchedCategoryName = rawMainCat;
       let matchedSubCategoryId = null;
-      let matchedSubCategoryName = '';
+      let matchedSubCategoryName = rawSubCat;
 
       if (!rawMainCat) {
         errors.push('Main Category is required');
@@ -450,9 +451,7 @@ export const bulkImportService = {
           c => !c.parentId && c.name.toLowerCase().trim() === rawMainCat.toLowerCase()
         );
 
-        if (!mainCat) {
-          errors.push(`Main Category "${rawMainCat}" not found in database`);
-        } else {
+        if (mainCat) {
           matchedCategoryId = mainCat.id;
           matchedCategoryName = mainCat.name;
 
@@ -461,9 +460,7 @@ export const bulkImportService = {
               c => c.parentId === mainCat.id && c.name.toLowerCase().trim() === rawSubCat.toLowerCase()
             );
 
-            if (!subCat) {
-              errors.push(`Subcategory "${rawSubCat}" not found under Main Category "${mainCat.name}"`);
-            } else {
+            if (subCat) {
               matchedSubCategoryId = subCat.id;
               matchedSubCategoryName = subCat.name;
             }
@@ -486,16 +483,14 @@ export const bulkImportService = {
         ? rawTags.split(',').map(t => t.trim()).filter(Boolean)
         : [];
 
-      // 10. Images (1 to 4)
+      // 10. Images (1 to 4) — Optional
       const img1 = String(row['Image 1'] || row['image1'] || row['image'] || '').trim();
       const img2 = String(row['Image 2'] || row['image2'] || '').trim();
       const img3 = String(row['Image 3'] || row['image3'] || '').trim();
       const img4 = String(row['Image 4'] || row['image4'] || '').trim();
 
       const images = [img1, img2, img3, img4].filter(Boolean);
-      if (images.length === 0) {
-        errors.push('At least one product image is required (Image 1)');
-      } else if (zipImagesMap.size > 0) {
+      if (images.length > 0 && zipImagesMap.size > 0) {
         // Validate if image path exists in zip when image is a relative filename
         images.forEach((im, imgIdx) => {
           if (!im.startsWith('http://') && !im.startsWith('https://') && !im.startsWith('/uploads/') && !im.startsWith('data:')) {
@@ -586,6 +581,9 @@ export const bulkImportService = {
       failed: [],
     };
 
+    // Load active category tree from database to handle dynamic auto-creation
+    let dbCategories = await prisma.category.findMany();
+
     for (let i = 0; i < productsToImport.length; i++) {
       const item = productsToImport[i];
       try {
@@ -595,14 +593,67 @@ export const bulkImportService = {
           if (storedUrl) processedImages.push(storedUrl);
         }
 
+        // 1. Resolve or Auto-Create Main Category
+        let resolvedCategoryId = item.categoryId;
+        const mainCatName = (item.mainCategoryName || '').trim();
+
+        if (!resolvedCategoryId && mainCatName) {
+          let foundMain = dbCategories.find(
+            c => !c.parentId && c.name.toLowerCase().trim() === mainCatName.toLowerCase()
+          );
+
+          if (!foundMain) {
+            const baseSlug = slugify(mainCatName) || `cat-${Date.now()}`;
+            const slugExists = dbCategories.some(c => c.slug === baseSlug);
+            const finalSlug = slugExists ? `${baseSlug}-${Date.now().toString().slice(-4)}` : baseSlug;
+
+            foundMain = await prisma.category.create({
+              data: {
+                name: mainCatName,
+                slug: finalSlug,
+                description: `${mainCatName} Category`,
+              },
+            });
+            dbCategories.push(foundMain);
+          }
+          resolvedCategoryId = foundMain.id;
+        }
+
+        // 2. Resolve or Auto-Create Subcategory
+        let resolvedSubCategoryId = item.subCategoryId;
+        const subCatName = (item.subcategoryName || item.subCategoryName || '').trim();
+
+        if (resolvedCategoryId && !resolvedSubCategoryId && subCatName) {
+          let foundSub = dbCategories.find(
+            c => c.parentId === resolvedCategoryId && c.name.toLowerCase().trim() === subCatName.toLowerCase()
+          );
+
+          if (!foundSub) {
+            const baseSubSlug = slugify(subCatName) || `subcat-${Date.now()}`;
+            const subSlugExists = dbCategories.some(c => c.slug === baseSubSlug);
+            const finalSubSlug = subSlugExists ? `${baseSubSlug}-${Date.now().toString().slice(-4)}` : baseSubSlug;
+
+            foundSub = await prisma.category.create({
+              data: {
+                name: subCatName,
+                slug: finalSubSlug,
+                parentId: resolvedCategoryId,
+                description: `${subCatName} Subcategory`,
+              },
+            });
+            dbCategories.push(foundSub);
+          }
+          resolvedSubCategoryId = foundSub.id;
+        }
+
         const payload = {
           name: item.name,
           sku: item.sku || undefined,
           price: parseFloat(item.price),
           comparePrice: item.comparePrice ? parseFloat(item.comparePrice) : null,
           stock: parseInt(item.stock, 10) || 0,
-          categoryId: item.categoryId,
-          subCategoryId: item.subCategoryId || null,
+          categoryId: resolvedCategoryId,
+          subCategoryId: resolvedSubCategoryId || null,
           description: item.description,
           specifications: item.specifications || undefined,
           tags: Array.isArray(item.tags) ? item.tags : [],

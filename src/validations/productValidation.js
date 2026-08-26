@@ -6,7 +6,7 @@ export const createProductSchema = z.object({
   price: z.number().min(0, 'Price must be 0 or positive'),
   comparePrice: z.number().optional().nullable(),
   stock: z.number().int().min(0, 'Stock cannot be negative').default(0),
-  images: z.array(z.string().min(1)).min(1, 'At least one image required'),
+  images: z.array(z.string()).optional().default([]),
   sku: z.string().optional().nullable(),
   weight: z.number().optional().nullable(),
   featured: z.boolean().optional().default(false),
@@ -38,4 +38,5 @@ export const productQuerySchema = z.object({
   maxPrice: z.string().optional(),
   sort: z.enum(['price_asc', 'price_desc', 'newest', 'rating', 'featured']).optional().default('newest'),
   featured: z.string().optional(),
+  showAll: z.string().optional(),
 });

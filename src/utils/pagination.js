@@ -7,7 +7,7 @@
  */
 export const paginate = (page = 1, limit = 12, total = 0) => {
   const parsedPage  = Math.max(1, parseInt(page, 10)  || 1);
-  const parsedLimit = Math.min(100, Math.max(1, parseInt(limit, 10) || 12));
+  const parsedLimit = Math.min(1000, Math.max(1, parseInt(limit, 10) || 12));
   const totalPages  = Math.ceil(total / parsedLimit);
   const skip        = (parsedPage - 1) * parsedLimit;
 
