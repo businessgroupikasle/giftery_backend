@@ -79,14 +79,10 @@ export const enquiryController = {
         console.warn('Prisma fetch enquiries fallback to memory:', dbErr.message);
       }
 
-      // Merge DB enquiries with fallback/demo list for rich presentation
-      const mergedMap = new Map();
-      dbEnquiries.forEach(e => mergedMap.set(e.id, e));
-      fallbackEnquiries.forEach(e => {
-        if (!mergedMap.has(e.id)) mergedMap.set(e.id, e);
-      });
+      // Return DB enquiries
+      const listToReturn = dbEnquiries.length > 0 ? dbEnquiries : fallbackEnquiries;
 
-      const resultList = Array.from(mergedMap.values()).map(e => ({
+      const resultList = listToReturn.map(e => ({
         ...e,
         createdAt: e.createdAt ? new Date(e.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent',
       }));
