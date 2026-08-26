@@ -52,23 +52,6 @@ export const seedDatabase = async () => {
       logger.info(`✅ Store Admin created: ${adminEmail}`);
     }
 
-    // Seed Customer User
-    const userEmail = 'user@giftery.com';
-    const existingUser = await prisma.user.findUnique({ where: { email: userEmail } });
-    if (!existingUser) {
-      const hashedPassword = await bcrypt.hash('User@123', 12);
-      await prisma.user.create({
-        data: {
-          name: 'John Doe',
-          email: userEmail,
-          password: hashedPassword,
-          role: 'USER',
-          isActive: true,
-        },
-      });
-      logger.info(`✅ Demo Customer created: ${userEmail}`);
-    }
-
     logger.info('🌱 Database seeding check complete.');
   } catch (err) {
     logger.warn('⚠️ Seeding note:', err.message);

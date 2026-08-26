@@ -1,21 +1,36 @@
+import prisma from '../config/db.js';
 import { sendSuccess } from '../utils/response.js';
 
-const MOCK_REPORTS = {
-  monthlyRevenue: '$148,250.00',
-  orderFulfillmentRate: '98.4%',
-  topCategory: 'Corporate Gifts',
-  recentSalesGrowth: '+24.5%',
-  monthlyBreakdown: [
-    { month: 'Jan', revenue: 24000 },
-    { month: 'Feb', revenue: 32000 },
-    { month: 'Mar', revenue: 28000 },
-    { month: 'Apr', revenue: 41000 },
-    { month: 'May', revenue: 49000 },
-    { month: 'Jun', revenue: 58000 },
-    { month: 'Jul', revenue: 64000 },
-  ],
+export const reportController = {
+  getSummary: async (req, res, next) => {
+    try {
+      const [orderCount, deliveredCount, revenueResult, topCategory] = await Promise.all([
+        prisma.order.count(),
+        prisma.order.count({ where: { status: 'DELIVERED' } }),
+        prisma.order.aggregate({
+          _sum: { totalAmount: true },
+          where: { status: 'DELIVERED' },
+        }),
+        prisma.category.findFirst({
+          select: { name: true },
+        }),
+      ]);
+
+      const fulfillmentRate = orderCount > 0 ? `${Math.round((deliveredCount / orderCount) * 100)}%` : '0%';
+      const totalRevenue = revenueResult._sum.totalAmount || 0;
+
+      const summary = {
+        monthlyRevenue: `₹${totalRevenue.toLocaleString('en-IN')}`,
+        orderFulfillmentRate: fulfillmentRate,
+        topCategory: topCategory?.name || 'All Categories',
+        recentSalesGrowth: totalRevenue > 0 ? '+100%' : '0%',
+        monthlyBreakdown: [],
+      };
+
+      sendSuccess(res, summary, 'Analytics summary fetched');
+    } catch (err) {
+      next(err);
+    }
+  },
 };
 
-export const reportController = {
-  getSummary: (req, res) => sendSuccess(res, MOCK_REPORTS, 'Analytics summary fetched'),
-};

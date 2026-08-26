@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting full seed for Main Categories, Subcategories & Products...');
+  console.log('🌱 Starting seed for Categories & Admin Users...');
 
   // ── Clean up ────────────────────────────────────────────────
   await prisma.review.deleteMany();
@@ -20,10 +20,9 @@ async function main() {
   await prisma.address.deleteMany();
   await prisma.user.deleteMany();
 
-  // ── Users ───────────────────────────────────────────────────
+  // ── Users (Super Admin & Admin only) ─────────────────────────
   const superAdminPassword = await bcrypt.hash('SuperAdmin@123', 12);
   const adminPassword = await bcrypt.hash('Admin@123', 12);
-  const userPassword  = await bcrypt.hash('User@123', 12);
 
   await prisma.user.create({
     data: {
@@ -34,7 +33,7 @@ async function main() {
     },
   });
 
-  const admin = await prisma.user.create({
+  await prisma.user.create({
     data: {
       name: 'Store Admin',
       email: 'admin@giftery.com',
@@ -43,16 +42,7 @@ async function main() {
     },
   });
 
-  const customer = await prisma.user.create({
-    data: {
-      name: 'Jane Doe',
-      email: 'user@giftery.com',
-      password: userPassword,
-      role: 'USER',
-    },
-  });
-
-  console.log('✅ Users created');
+  console.log('✅ Admin & Super Admin users created');
 
   // ── 1. Main Categories ──────────────────────────────────────────
   const corporateGifts = await prisma.category.create({
@@ -104,9 +94,8 @@ async function main() {
     { name: 'Keychains', slug: 'keychains' },
   ];
 
-  const corpSubCategoryMap = {};
   for (const sub of corpSubcategories) {
-    const created = await prisma.category.create({
+    await prisma.category.create({
       data: {
         name: sub.name,
         slug: sub.slug,
@@ -115,7 +104,6 @@ async function main() {
         image: '/images/cat_corporate.png',
       },
     });
-    corpSubCategoryMap[sub.slug] = created;
   }
 
   // ── 3. Personalized Gifts Subcategories (5 Subcategories) ─────────
@@ -127,9 +115,8 @@ async function main() {
     { name: 'Wooden Photo Engraving', slug: 'wooden-photo-engraving' },
   ];
 
-  const persSubCategoryMap = {};
   for (const sub of personalizedSubcategories) {
-    const created = await prisma.category.create({
+    await prisma.category.create({
       data: {
         name: sub.name,
         slug: sub.slug,
@@ -138,7 +125,6 @@ async function main() {
         image: '/images/cat_welcome.png',
       },
     });
-    persSubCategoryMap[sub.slug] = created;
   }
 
   // ── 4. Toys Subcategories (12 Subcategories) ──────────────────────
@@ -157,9 +143,8 @@ async function main() {
     { name: 'Outdoor Toys', slug: 'outdoor-toys' },
   ];
 
-  const toysSubCategoryMap = {};
   for (const sub of toysSubcategories) {
-    const created = await prisma.category.create({
+    await prisma.category.create({
       data: {
         name: sub.name,
         slug: sub.slug,
@@ -168,182 +153,12 @@ async function main() {
         image: '/images/cat_tech.png',
       },
     });
-    toysSubCategoryMap[sub.slug] = created;
   }
 
   console.log('✅ All Subcategories created (16 Corporate + 5 Personalized + 12 Toys = 33 Subcategories)');
-
-  // ── 5. Products Seeding ──────────────────────────────────────────
-  const products = await Promise.all([
-    // Corporate Gifts Products
-    prisma.product.create({
-      data: {
-        name: 'Executive Kinetic Desk Gyro Sculpture',
-        slug: 'executive-kinetic-desk-gyro-sculpture',
-        description: 'Make a lasting first impression with our Executive Kinetic Desk Gyro Sculpture. Perfect for onboarding new executives and luxury corporate gifting.',
-        price: 1499,
-        comparePrice: 1999,
-        stock: 50,
-        images: ['https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&auto=format&fit=crop&q=80'],
-        sku: 'CORP-GYRO-001',
-        featured: true,
-        categoryId: corporateGifts.id,
-        subCategoryId: corpSubCategoryMap['onboarding-kit']?.id,
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: '3D Wooden Mechanical Gear Clock Puzzle',
-        slug: '3d-wooden-mechanical-gear-clock-puzzle',
-        description: 'Exquisite handcrafted 3D wooden gear clock puzzle. Combines mechanical art with functional quartz timekeeping.',
-        price: 2199,
-        comparePrice: 2799,
-        stock: 40,
-        images: ['https://images.unsplash.com/photo-1549465220-1a8b9238cd48?w=800&auto=format&fit=crop&q=80'],
-        sku: 'CORP-CLK-002',
-        featured: true,
-        categoryId: corporateGifts.id,
-        subCategoryId: corpSubCategoryMap['work-anniversary-kit']?.id,
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Executive Stainless Steel Hydration Bottle',
-        slug: 'executive-stainless-steel-hydration-bottle',
-        description: 'Double-wall vacuum insulated stainless steel bottle. Keeps drinks cold for 24 hours and hot for 12 hours.',
-        price: 799,
-        comparePrice: 999,
-        stock: 85,
-        images: ['https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800&auto=format&fit=crop&q=80'],
-        sku: 'CORP-DRINK-003',
-        featured: true,
-        categoryId: corporateGifts.id,
-        subCategoryId: corpSubCategoryMap['drinkware']?.id,
-      },
-    }),
-
-    // Personalized Gifts Products
-    prisma.product.create({
-      data: {
-        name: 'Personalized Leather Notebook & Pen Set',
-        slug: 'personalized-leather-notebook-pen-set',
-        description: 'Custom embossed PU leather notebook with metallic pen. Premium office gift for team members and corporate clients.',
-        price: 899,
-        comparePrice: 1299,
-        stock: 100,
-        images: ['https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800&auto=format&fit=crop&q=80'],
-        sku: 'PERS-NOTE-001',
-        featured: true,
-        categoryId: personalizedGifts.id,
-        subCategoryId: persSubCategoryMap['wooden-photo-engraving']?.id,
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: '3D Acrylic Photo Standee with LED Base',
-        slug: '3d-acrylic-photo-standee-led-base',
-        description: 'Custom laser engraved acrylic photo frame with warm LED wooden base. Cherish special memories with custom lighting.',
-        price: 1299,
-        comparePrice: 1699,
-        stock: 65,
-        images: ['https://images.unsplash.com/photo-1513519245088-0e12902e5a38?w=800&auto=format&fit=crop&q=80'],
-        sku: 'PERS-ACRY-002',
-        featured: true,
-        categoryId: personalizedGifts.id,
-        subCategoryId: persSubCategoryMap['acrylic-frames']?.id,
-      },
-    }),
-
-    // Toys Products
-    prisma.product.create({
-      data: {
-        name: 'Remote Control High-Speed Stunt Car',
-        slug: 'remote-control-high-speed-stunt-car',
-        description: '360-degree rotating RC stunt car with LED headlights and rechargeable battery. Fun toy for kids aged 6-12.',
-        price: 1899,
-        comparePrice: 2499,
-        stock: 80,
-        images: ['https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=800&auto=format&fit=crop&q=80'],
-        sku: 'TOYS-RC-001',
-        featured: true,
-        categoryId: toys.id,
-        subCategoryId: toysSubCategoryMap['remote-control-toys']?.id,
-      },
-    }),
-    prisma.product.create({
-      data: {
-        name: 'Educational STEM Building Blocks Set',
-        slug: 'educational-stem-building-blocks-set',
-        description: 'Interactive 250-piece building block kit designed to encourage spatial learning and creativity in young minds.',
-        price: 1199,
-        comparePrice: 1599,
-        stock: 60,
-        images: ['https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800&auto=format&fit=crop&q=80'],
-        sku: 'TOYS-STEM-002',
-        featured: true,
-        categoryId: toys.id,
-        subCategoryId: toysSubCategoryMap['building-blocks']?.id,
-      },
-    }),
-  ]);
-
-  console.log(`✅ ${products.length} Products created across subcategories`);
-
-  // ── 6. Demo Order & Payment ──────────────────────────────────────
-  const order = await prisma.order.create({
-    data: {
-      userId: customer.id,
-      status: 'DELIVERED',
-      totalAmount: 3398.0,
-      shippingAddress: {
-        fullName: 'Jane Doe',
-        street: '123 Luxury Lane',
-        city: 'Chennai',
-        state: 'Tamil Nadu',
-        zip: '600001',
-        country: 'India',
-        phone: '+91-9876543210',
-      },
-      items: {
-        create: [
-          { productId: products[0].id, quantity: 1, price: products[0].price, name: products[0].name },
-          { productId: products[1].id, quantity: 1, price: products[1].price, name: products[1].name },
-        ],
-      },
-    },
-  });
-
-  await prisma.payment.create({
-    data: {
-      orderId: order.id,
-      status: 'SUCCEEDED',
-      amount: order.totalAmount,
-      stripePaymentId: 'pay_demo_seed_payment_001',
-    },
-  });
-
-  // ── Demo Reviews ─────────────────────────────────────────────
-  await prisma.review.createMany({
-    data: [
-      {
-        userId: customer.id,
-        productId: products[0].id,
-        rating: 5,
-        comment: 'Absolutely top-notch executive desk sculpture quality!',
-      },
-      {
-        userId: customer.id,
-        productId: products[1].id,
-        rating: 5,
-        comment: 'Beautiful 3D gear clock puzzle. Great for corporate gifting!',
-      },
-    ],
-  });
-
-  console.log('✅ Demo order + reviews created');
-
-  console.log('\n🎉 Seed complete! All Categories & Subcategories are loaded in Database!');
+  console.log('\n🎉 Seed complete! Categories & Subcategories are loaded in Database!');
   console.log('   Admin Credentials: admin@giftery.com / Admin@123');
+  console.log('   Super Admin: superadmin@giftery.com / SuperAdmin@123');
 }
 
 main()
@@ -354,3 +169,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+

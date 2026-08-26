@@ -60,6 +60,8 @@ model User {
   wishlist  Wishlist?
   reviews   Review[]
   addresses Address[]
+  passwordResetTokens PasswordResetToken[]
+  passwordResetOTPs   PasswordResetOTP[]
 
   @@map("users")
 }
@@ -260,4 +262,36 @@ model Enquiry {
   updatedAt DateTime @updatedAt
 
   @@map("enquiries")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
+}
+
+model PasswordResetOTP {
+  id          String    @id @default(cuid())
+  userId      String
+  otpHash     String
+  resetToken  String?   @unique
+  attempts    Int       @default(0)
+  expiresAt   DateTime
+  verifiedAt  DateTime?
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([resetToken])
+  @@map("password_reset_otps")
 }

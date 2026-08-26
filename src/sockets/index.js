@@ -47,3 +47,34 @@ export const emitOrderUpdate = (userId, data) => {
     global.io.to(`user:${userId}`).emit('order:update', data);
   }
 };
+
+/**
+ * Emits a real-time event when a new order is placed in the database.
+ * @param {object} order
+ */
+export const emitOrderCreated = (order) => {
+  if (global.io) {
+    global.io.emit('order:created', order);
+  }
+};
+
+/**
+ * Emits a real-time event when a customer submits an enquiry.
+ * @param {object} enquiry
+ */
+export const emitEnquiryCreated = (enquiry) => {
+  if (global.io) {
+    global.io.emit('enquiry:created', enquiry);
+  }
+};
+
+/**
+ * Emits a real-time event when a new customer registers.
+ * @param {object} customer
+ */
+export const emitCustomerCreated = (customer) => {
+  if (global.io) {
+    global.io.emit('customer:created', customer);
+  }
+};
+

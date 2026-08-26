@@ -1,6 +1,7 @@
 import { authService } from '../services/authService.js';
 import { sendSuccess } from '../utils/response.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
+import { emitCustomerCreated } from '../sockets/index.js';
 
 export const authController = {
   requestOTP: async (req, res, next) => {
@@ -13,6 +14,18 @@ export const authController = {
   register: async (req, res, next) => {
     try {
       const result = await authService.register(req.body);
+
+      // Emit Socket.IO event only after database user creation succeeds
+      if (result.user) {
+        emitCustomerCreated({
+          id: result.user.id,
+          name: result.user.name,
+          email: result.user.email,
+          role: result.user.role || 'USER',
+          createdAt: result.user.createdAt || new Date().toISOString(),
+        });
+      }
+
       sendSuccess(res, result, result.message || 'Account created successfully', HTTP_STATUS.CREATED);
     } catch (err) { next(err); }
   },
@@ -52,7 +65,36 @@ export const authController = {
     } catch (err) { next(err); }
   },
 
+  forgotPassword: async (req, res, next) => {
+    try {
+      const result = await authService.forgotPassword(req.body);
+      sendSuccess(res, null, result.message, HTTP_STATUS.OK);
+    } catch (err) { next(err); }
+  },
+
+  verifyResetOTP: async (req, res, next) => {
+    try {
+      const result = await authService.verifyResetOTP(req.body);
+      sendSuccess(res, { resetToken: result.resetToken }, result.message, HTTP_STATUS.OK);
+    } catch (err) { next(err); }
+  },
+
+  resendResetOTP: async (req, res, next) => {
+    try {
+      const result = await authService.resendResetOTP(req.body);
+      sendSuccess(res, null, result.message, HTTP_STATUS.OK);
+    } catch (err) { next(err); }
+  },
+
+  resetPassword: async (req, res, next) => {
+    try {
+      const result = await authService.resetPassword(req.body);
+      sendSuccess(res, null, result.message, HTTP_STATUS.OK);
+    } catch (err) { next(err); }
+  },
+
   logout: (_req, res) => {
     sendSuccess(res, null, 'Logged out successfully');
   },
 };
+

@@ -1,40 +1,10 @@
 import { sendSuccess, sendError } from '../utils/response.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
+import { emitEnquiryCreated } from '../sockets/index.js';
 import prisma from '../config/db.js';
 
-// In-memory store fallback initialized with demo enquiries
-let fallbackEnquiries = [
-  {
-    id: 'enq-101',
-    name: 'Tech Solutions Pvt. Ltd.',
-    email: 'contact@techsolutions.com',
-    phone: '+91 98765 43210',
-    subject: 'Bulk Corporate Gifts Inquiry',
-    message: 'We are looking to order 200 customized executive gift hampers for our annual Diwali company event. Please share product catalog and pricing.',
-    status: 'New',
-    createdAt: '2026-08-01T10:15:00.000Z',
-  },
-  {
-    id: 'enq-102',
-    name: 'Rahul Verma',
-    email: 'rahul.verma@gmail.com',
-    phone: '+91 91234 56789',
-    subject: 'Personalized Leather Notebook Engraving',
-    message: 'Can I add individual employee names on each leather notebook in gold foil embossing?',
-    status: 'In Progress',
-    createdAt: '2026-08-01T08:30:00.000Z',
-  },
-  {
-    id: 'enq-103',
-    name: 'ABC Corporation',
-    email: 'procurement@abccorp.in',
-    phone: '+91 99887 76655',
-    subject: 'Custom Branding Quote',
-    message: 'Requesting quote for 500 customized thermal water bottles with laser engraved company logo.',
-    status: 'Resolved',
-    createdAt: '2026-07-31T14:20:00.000Z',
-  },
-];
+// In-memory store fallback for enquiries
+let fallbackEnquiries = [];
 
 export const enquiryController = {
   // Public: Submit enquiry from contact form
@@ -76,6 +46,18 @@ export const enquiryController = {
         };
         fallbackEnquiries.unshift(newEnquiry);
       }
+
+      // Emit Socket.IO event only after database / memory creation succeeds
+      emitEnquiryCreated({
+        id: newEnquiry.id,
+        name: newEnquiry.name,
+        email: newEnquiry.email,
+        phone: newEnquiry.phone,
+        subject: newEnquiry.subject || 'General Inquiry',
+        message: newEnquiry.message,
+        status: newEnquiry.status || 'New',
+        createdAt: newEnquiry.createdAt || new Date().toISOString(),
+      });
 
       return sendSuccess(res, newEnquiry, 'Enquiry submitted successfully', HTTP_STATUS.CREATED);
     } catch (err) {
