@@ -78,3 +78,13 @@ export const emitCustomerCreated = (customer) => {
   }
 };
 
+/**
+ * Emits a real-time event when Maintenance Mode is updated.
+ * @param {{ maintenanceMode: boolean }} data
+ */
+export const emitMaintenanceUpdated = (data) => {
+  if (global.io) {
+    global.io.emit('maintenance:updated', data);
+  }
+};
+
