@@ -98,32 +98,53 @@ export const productService = {
   getAll: async (query) => {
     const { page, limit, search, categoryId, subCategoryId, minPrice, maxPrice, sort, featured, showAll } = query;
 
-    const where = {
-      ...(showAll !== 'true' && { isActive: true }),
-      ...(search && {
+    const andConditions = [];
+
+    if (showAll !== 'true') {
+      andConditions.push({ isActive: true });
+    }
+
+    if (search && search.trim()) {
+      andConditions.push({
         OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
-          { sku: { contains: search, mode: 'insensitive' } },
+          { name: { contains: search.trim(), mode: 'insensitive' } },
+          { description: { contains: search.trim(), mode: 'insensitive' } },
+          { sku: { contains: search.trim(), mode: 'insensitive' } },
         ]
-      }),
-      ...(subCategoryId
-        ? { subCategoryId }
-        : (categoryId && {
-            OR: [
-              { categoryId: categoryId },
-              { subCategoryId: categoryId },
-              { category: { parentId: categoryId } },
-            ]
-          })),
-      ...(featured !== undefined && { featured: featured === 'true' }),
-      ...((minPrice || maxPrice) && {
+      });
+    }
+
+    if (subCategoryId && subCategoryId !== 'all') {
+      andConditions.push({
+        OR: [
+          { subCategoryId: subCategoryId },
+          { categoryId: subCategoryId },
+        ]
+      });
+    } else if (categoryId && categoryId !== 'all' && categoryId !== 'unassigned') {
+      andConditions.push({
+        OR: [
+          { categoryId: categoryId },
+          { subCategoryId: categoryId },
+          { category: { parentId: categoryId } },
+        ]
+      });
+    }
+
+    if (featured !== undefined) {
+      andConditions.push({ featured: featured === 'true' });
+    }
+
+    if (minPrice || maxPrice) {
+      andConditions.push({
         price: {
           ...(minPrice && { gte: parseFloat(minPrice) }),
           ...(maxPrice && { lte: parseFloat(maxPrice) }),
-        },
-      }),
-    };
+        }
+      });
+    }
+
+    const where = andConditions.length > 0 ? { AND: andConditions } : {};
 
     const total = await productRepository.count(where);
     const meta = paginate(page, limit, total);
