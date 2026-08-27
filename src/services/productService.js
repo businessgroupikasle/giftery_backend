@@ -6,11 +6,11 @@ import { fileUploadHelper } from '../helpers/fileUpload.js';
 import prisma from '../config/db.js';
 
 const sortMap = {
-  price_asc: { price: 'asc' },
-  price_desc: { price: 'desc' },
-  newest: { createdAt: 'desc' },
-  rating: { reviews: { _count: 'desc' } },
-  featured: { featured: 'desc' },
+  price_asc: [{ price: 'asc' }, { id: 'desc' }],
+  price_desc: [{ price: 'desc' }, { id: 'desc' }],
+  newest: [{ createdAt: 'desc' }, { id: 'desc' }],
+  rating: [{ rating: 'desc' }, { id: 'desc' }],
+  featured: [{ featured: 'desc' }, { id: 'desc' }],
 };
 
 const sanitizeProductData = (inputData = {}) => {
@@ -96,7 +96,7 @@ const sanitizeProductData = (inputData = {}) => {
 
 export const productService = {
   getAll: async (query) => {
-    const { page, limit, search, categoryId, minPrice, maxPrice, sort, featured, showAll } = query;
+    const { page, limit, search, categoryId, subCategoryId, minPrice, maxPrice, sort, featured, showAll } = query;
 
     const where = {
       ...(showAll !== 'true' && { isActive: true }),
@@ -107,7 +107,15 @@ export const productService = {
           { sku: { contains: search, mode: 'insensitive' } },
         ]
       }),
-      ...(categoryId && { categoryId }),
+      ...(subCategoryId
+        ? { subCategoryId }
+        : (categoryId && {
+            OR: [
+              { categoryId: categoryId },
+              { subCategoryId: categoryId },
+              { category: { parentId: categoryId } },
+            ]
+          })),
       ...(featured !== undefined && { featured: featured === 'true' }),
       ...((minPrice || maxPrice) && {
         price: {
@@ -119,7 +127,12 @@ export const productService = {
 
     const total = await productRepository.count(where);
     const meta = paginate(page, limit, total);
-    const data = await productRepository.findMany({ skip: meta.skip, take: meta.take, where, orderBy: sortMap[sort] || sortMap.newest });
+    const data = await productRepository.findMany({
+      skip: meta.skip,
+      take: meta.take,
+      where,
+      orderBy: sortMap[sort] || sortMap.newest,
+    });
 
     return { data, meta };
   },

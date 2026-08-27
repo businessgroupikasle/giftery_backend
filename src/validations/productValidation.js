@@ -30,10 +30,11 @@ export const createProductSchema = z.object({
 export const updateProductSchema = createProductSchema.partial();
 
 export const productQuerySchema = z.object({
-  page: z.string().default('1'),
-  limit: z.string().default('12'),
+  page: z.string().optional().default('1'),
+  limit: z.string().optional().default('12'),
   search: z.string().optional(),
   categoryId: z.string().optional(),
+  subCategoryId: z.string().optional(),
   minPrice: z.string().optional(),
   maxPrice: z.string().optional(),
   sort: z.enum(['price_asc', 'price_desc', 'newest', 'rating', 'featured']).optional().default('newest'),
