@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { env } from './config/env.js';
@@ -44,14 +45,29 @@ app.use(globalLimiter);
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
-import fs from 'fs';
-
 // ── Static Files (Uploads) ─────────────────────────────────────
 const uploadPath = path.isAbsolute(env.UPLOAD_DIR)
   ? env.UPLOAD_DIR
   : path.resolve(process.cwd(), env.UPLOAD_DIR);
 if (!fs.existsSync(uploadPath)) {
   fs.mkdirSync(uploadPath, { recursive: true });
+}
+
+// Automatically sync seed-assets into uploadPath if seed-assets directory exists
+const seedAssetsDir = path.resolve(__dirname, '../seed-assets');
+if (fs.existsSync(seedAssetsDir)) {
+  try {
+    const seedFiles = fs.readdirSync(seedAssetsDir);
+    for (const file of seedFiles) {
+      const srcFile = path.join(seedAssetsDir, file);
+      const destFile = path.join(uploadPath, file);
+      if (fs.statSync(srcFile).isFile() && !fs.existsSync(destFile)) {
+        fs.copyFileSync(srcFile, destFile);
+      }
+    }
+  } catch (err) {
+    logger.warn(`Failed to copy seed assets to uploads directory: ${err.message}`);
+  }
 }
 app.use('/uploads', express.static(uploadPath));
 

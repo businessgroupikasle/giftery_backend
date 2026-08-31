@@ -1,10 +1,42 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('🌱 Starting seed for Categories & Admin Users...');
+
+  // ── Sync Seed Assets to Environment-based Upload Directory ───
+  const uploadDirEnv = process.env.UPLOAD_DIR || 'Uploads';
+  const uploadPath = path.isAbsolute(uploadDirEnv)
+    ? uploadDirEnv
+    : path.resolve(process.cwd(), uploadDirEnv);
+
+  if (!fs.existsSync(uploadPath)) {
+    fs.mkdirSync(uploadPath, { recursive: true });
+  }
+
+  const seedAssetsDir = path.resolve(__dirname, '../seed-assets');
+  if (fs.existsSync(seedAssetsDir)) {
+    const seedFiles = fs.readdirSync(seedAssetsDir);
+    let count = 0;
+    for (const file of seedFiles) {
+      const srcFile = path.join(seedAssetsDir, file);
+      const destFile = path.join(uploadPath, file);
+      if (fs.statSync(srcFile).isFile()) {
+        fs.copyFileSync(srcFile, destFile);
+        count++;
+      }
+    }
+    console.log(`📁 Synced ${count} seed asset files to ${uploadPath}`);
+  }
 
   // ── Clean up ────────────────────────────────────────────────
   await prisma.review.deleteMany();
@@ -126,7 +158,7 @@ async function main() {
       },
     });
   }
-
+  
   // ── 4. Toys Subcategories (12 Subcategories) ──────────────────────
   const toysSubcategories = [
     { name: '0 – 2 Years', slug: '0-2-years' },
