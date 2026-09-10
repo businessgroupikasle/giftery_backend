@@ -53,3 +53,6 @@ coverage/
 
 # ── Docker ────────────────────────────────────────────────────
 .dockerignore
+
+# ── Local runner helper ───────────────────────────────────────
+powershell.cmd

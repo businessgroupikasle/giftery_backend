@@ -7,6 +7,7 @@ import prisma from './config/db.js';
 
 import { seedDatabase } from './utils/seed.js';
 
+// Server instance
 const server = http.createServer(app);
 
 // ── Socket.IO ───────────────────────────────────────────────────

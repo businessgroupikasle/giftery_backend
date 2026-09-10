@@ -12,6 +12,8 @@
     "prisma:generate": "prisma generate",
     "prisma:studio": "prisma studio",
     "prisma:seed": "node prisma/seed.js",
+    "seed:test-products": "node scripts/seed-test-products.js",
+    "remove:test-products": "node scripts/remove-test-products.js",
     "prisma:reset": "prisma migrate reset --force",
     "lint": "eslint src --ext .js"
   },

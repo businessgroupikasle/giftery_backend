@@ -52,6 +52,28 @@ export const seedDatabase = async () => {
       logger.info(`✅ Store Admin created: ${adminEmail}`);
     }
 
+    // Clean up test seed products if any exist
+    const testProducts = await prisma.product.findMany({
+      where: {
+        OR: [
+          { slug: { startsWith: 'test-' } },
+          { sku: { startsWith: 'TEST-GIFT-' } },
+          { tags: { has: 'test-product' } },
+        ],
+      },
+      select: { id: true, name: true },
+    });
+
+    if (testProducts.length > 0) {
+      const ids = testProducts.map((p) => p.id);
+      await prisma.cartItem.deleteMany({ where: { productId: { in: ids } } });
+      await prisma.wishlistItem.deleteMany({ where: { productId: { in: ids } } });
+      await prisma.review.deleteMany({ where: { productId: { in: ids } } });
+      await prisma.orderItem.deleteMany({ where: { productId: { in: ids } } });
+      const delResult = await prisma.product.deleteMany({ where: { id: { in: ids } } });
+      logger.info(`🗑️ Removed ${delResult.count} test seed products from database.`);
+    }
+
     logger.info('🌱 Database seeding check complete.');
   } catch (err) {
     logger.warn('⚠️ Seeding note:', err.message);
