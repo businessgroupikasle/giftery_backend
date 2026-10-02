@@ -74,7 +74,7 @@ async function main() {
     },
   });
 
-  console.log('✅ Admin & Super Admin users created');
+  console.log(' Admin & Super Admin users created');
 
   // ── 1. Main Categories ──────────────────────────────────────────
   const corporateGifts = await prisma.category.create({
@@ -104,7 +104,7 @@ async function main() {
     },
   });
 
-  console.log('✅ Main Categories created (Corporate Gifts, Personalized Gifts, Toys)');
+  console.log('Main Categories created (Corporate Gifts, Personalized Gifts, Toys)');
 
   // ── 2. Corporate Gifts Subcategories (16 Subcategories) ─────────────
   const corpSubcategories = [
@@ -187,15 +187,120 @@ async function main() {
     });
   }
 
-  console.log('✅ All Subcategories created (16 Corporate + 5 Personalized + 12 Toys = 33 Subcategories)');
-  console.log('\n🎉 Seed complete! Categories & Subcategories are loaded in Database!');
+  console.log(' All Subcategories created (16 Corporate + 5 Personalized + 12 Toys = 33 Subcategories)');
+
+  // ── 5. Products (distributed across all main categories) ─────────────
+  const productSubcategories = await prisma.category.findMany({
+    where: {
+      slug: {
+        in: [
+          'onboarding-kit', 'drinkware', 'electronics', 'trophies-awards',
+          'photo-frames', 'caricatures', 'wooden-photo-engraving',
+          'educational-toys', 'remote-control-toys', 'soft-toys',
+        ],
+      },
+    },
+    select: { id: true, slug: true },
+  });
+
+  const subcategoryIdBySlug = Object.fromEntries(
+    productSubcategories.map((subcategory) => [subcategory.slug, subcategory.id]),
+  );
+
+  const products = [
+    {
+      name: 'Premium Employee Welcome Kit', slug: 'premium-employee-welcome-kit',
+      description: 'A polished onboarding gift set with a notebook, bottle, pen and welcome card.',
+      price: 2499, comparePrice: 2999, stock: 40,
+      images: ['https://placehold.co/800x800?text=Welcome+Kit'], sku: 'CG-WELCOME-001',
+      featured: true, isGiftSet: true, categoryId: corporateGifts.id,
+      subCategoryId: subcategoryIdBySlug['onboarding-kit'], tags: ['corporate', 'onboarding', 'gift-set'],
+    },
+    {
+      name: 'Insulated Corporate Travel Tumbler', slug: 'insulated-corporate-travel-tumbler',
+      description: 'Double-wall insulated stainless-steel tumbler suitable for company branding.',
+      price: 899, comparePrice: 1099, stock: 75,
+      images: ['https://placehold.co/800x800?text=Travel+Tumbler'], sku: 'CG-TUMBLER-002',
+      isPopular: true, categoryId: corporateGifts.id,
+      subCategoryId: subcategoryIdBySlug.drinkware, tags: ['corporate', 'drinkware', 'office'],
+    },
+    {
+      name: 'Wireless Charging Desk Organizer', slug: 'wireless-charging-desk-organizer',
+      description: 'A modern desk organizer with an integrated wireless charging pad.',
+      price: 1799, comparePrice: 2199, stock: 30,
+      images: ['https://placehold.co/800x800?text=Desk+Organizer'], sku: 'CG-ELECTRONICS-003',
+      isNewArrival: true, categoryId: corporateGifts.id,
+      subCategoryId: subcategoryIdBySlug.electronics, tags: ['corporate', 'electronics', 'desk'],
+    },
+    {
+      name: 'Crystal Excellence Award', slug: 'crystal-excellence-award',
+      description: 'Elegant crystal award for employee recognition, milestones and achievements.',
+      price: 1499, stock: 25,
+      images: ['https://placehold.co/800x800?text=Crystal+Award'], sku: 'CG-AWARD-004',
+      isBestseller: true, categoryId: corporateGifts.id,
+      subCategoryId: subcategoryIdBySlug['trophies-awards'], tags: ['corporate', 'award', 'recognition'],
+    },
+    {
+      name: 'Personalized Family Photo Frame', slug: 'personalized-family-photo-frame',
+      description: 'Custom family photo frame with a personalized name and message.',
+      price: 999, comparePrice: 1299, stock: 50,
+      images: ['https://placehold.co/800x800?text=Photo+Frame'], sku: 'PG-FRAME-001',
+      featured: true, isMostLoved: true, categoryId: personalizedGifts.id,
+      subCategoryId: subcategoryIdBySlug['photo-frames'], tags: ['personalized', 'photo', 'family'],
+    },
+    {
+      name: 'Custom Couple Caricature Stand', slug: 'custom-couple-caricature-stand',
+      description: 'A cheerful custom couple caricature printed on a premium tabletop stand.',
+      price: 1299, stock: 35,
+      images: ['https://placehold.co/800x800?text=Couple+Caricature'], sku: 'PG-CARICATURE-002',
+      isPopular: true, categoryId: personalizedGifts.id,
+      subCategoryId: subcategoryIdBySlug.caricatures, tags: ['personalized', 'couple', 'caricature'],
+    },
+    {
+      name: 'Engraved Wooden Memory Plaque', slug: 'engraved-wooden-memory-plaque',
+      description: 'Natural wood plaque engraved with a favorite photograph and personal message.',
+      price: 1599, comparePrice: 1899, stock: 20,
+      images: ['https://placehold.co/800x800?text=Wooden+Plaque'], sku: 'PG-WOOD-003',
+      isNewArrival: true, categoryId: personalizedGifts.id,
+      subCategoryId: subcategoryIdBySlug['wooden-photo-engraving'], tags: ['personalized', 'wooden', 'engraving'],
+    },
+    {
+      name: 'Junior Science Experiment Kit', slug: 'junior-science-experiment-kit',
+      description: 'A hands-on science kit with safe experiments that encourage curiosity and learning.',
+      price: 1199, comparePrice: 1499, stock: 60,
+      images: ['https://placehold.co/800x800?text=Science+Kit'], sku: 'TOY-SCIENCE-001',
+      isBestseller: true, categoryId: toys.id,
+      subCategoryId: subcategoryIdBySlug['educational-toys'], tags: ['toys', 'educational', 'science'],
+    },
+    {
+      name: 'Remote Control Racing Car', slug: 'remote-control-racing-car',
+      description: 'Rechargeable remote-control racing car with responsive steering and LED lights.',
+      price: 1899, comparePrice: 2299, stock: 45,
+      images: ['https://placehold.co/800x800?text=RC+Racing+Car'], sku: 'TOY-RC-002',
+      featured: true, categoryId: toys.id,
+      subCategoryId: subcategoryIdBySlug['remote-control-toys'], tags: ['toys', 'remote-control', 'racing'],
+    },
+    {
+      name: 'Cuddly Teddy Bear', slug: 'cuddly-teddy-bear',
+      description: 'A soft, huggable teddy bear made with child-friendly fabric and filling.',
+      price: 799, stock: 80,
+      images: ['https://placehold.co/800x800?text=Teddy+Bear'], sku: 'TOY-SOFT-003',
+      isMostLoved: true, categoryId: toys.id,
+      subCategoryId: subcategoryIdBySlug['soft-toys'], tags: ['toys', 'soft-toy', 'teddy'],
+    },
+  ];
+
+  await prisma.product.createMany({ data: products });
+
+  console.log(' 10 Products created (4 Corporate + 3 Personalized + 3 Toys)');
+  console.log('\n Seed complete! Categories, Subcategories & Products are loaded in Database!');
   console.log('   Admin Credentials: admin@giftery.com / Admin@123');
   console.log('   Super Admin: superadmin@giftery.com / SuperAdmin@123');
 }
 
 main()
   .catch((e) => {
-    console.error('❌ Seed failed:', e);
+    console.error(' Seed failed:', e);
     process.exit(1);
   })
   .finally(async () => {

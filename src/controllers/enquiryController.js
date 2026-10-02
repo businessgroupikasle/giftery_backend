@@ -15,11 +15,23 @@ export const enquiryController = {
         return sendError(res, 'Name, email, and message are required', HTTP_STATUS.BAD_REQUEST);
       }
 
+      const year = new Date().getFullYear();
       let newEnquiry;
       try {
         if (prisma.enquiry) {
+          const totalEnquiries = await prisma.enquiry.count();
+          let readableId = `ENQ-${year}-${String(totalEnquiries + 1).padStart(4, '0')}`;
+          let exists = await prisma.enquiry.findUnique({ where: { id: readableId } });
+          let seq = totalEnquiries + 1;
+          while (exists) {
+            seq += 1;
+            readableId = `ENQ-${year}-${String(seq).padStart(4, '0')}`;
+            exists = await prisma.enquiry.findUnique({ where: { id: readableId } });
+          }
+
           newEnquiry = await prisma.enquiry.create({
             data: {
+              id: readableId,
               name,
               email,
               phone: phone || 'N/A',
@@ -34,8 +46,10 @@ export const enquiryController = {
       }
 
       if (!newEnquiry) {
+        const readableId = `ENQ-${year}-${String(fallbackEnquiries.length + 1).padStart(4, '0')}`;
         newEnquiry = {
-          id: `enq-${Date.now()}`,
+          id: readableId,
+          displayId: readableId,
           name,
           email,
           phone: phone || 'N/A',
@@ -82,10 +96,21 @@ export const enquiryController = {
       // Return DB enquiries
       const listToReturn = dbEnquiries.length > 0 ? dbEnquiries : fallbackEnquiries;
 
-      const resultList = listToReturn.map(e => ({
-        ...e,
-        createdAt: e.createdAt ? new Date(e.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent',
-      }));
+      const resultList = listToReturn.map((e, index) => {
+        const year = e.createdAt ? new Date(e.createdAt).getFullYear() || 2026 : 2026;
+        let displayId = e.id;
+        // If e.id is a CUID (e.g. cmudyrdkg000gzvm7anlm1ig5) or legacy timestamp
+        if (e.id && (!e.id.startsWith('ENQ-') || e.id.length > 15)) {
+          displayId = `ENQ-${year}-${String(listToReturn.length - index).padStart(4, '0')}`;
+        }
+        return {
+          ...e,
+          id: e.id,
+          displayId,
+          enquiryNumber: displayId,
+          createdAt: e.createdAt ? new Date(e.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Recent',
+        };
+      });
 
       return sendSuccess(res, resultList, 'Enquiries fetched successfully');
     } catch (err) {
@@ -102,10 +127,17 @@ export const enquiryController = {
       let updated;
       try {
         if (prisma.enquiry) {
-          updated = await prisma.enquiry.update({
-            where: { id },
-            data: { status },
-          });
+          let target = await prisma.enquiry.findUnique({ where: { id } });
+          if (!target) {
+            const all = await prisma.enquiry.findMany();
+            target = all.find(e => e.id === id);
+          }
+          if (target) {
+            updated = await prisma.enquiry.update({
+              where: { id: target.id },
+              data: { status },
+            });
+          }
         }
       } catch (dbErr) {
         console.warn('Prisma enquiry update fallback to memory:', dbErr.message);
@@ -113,11 +145,14 @@ export const enquiryController = {
 
       if (!updated) {
         const item = fallbackEnquiries.find((e) => e.id === id);
-        if (!item) {
-          return sendError(res, 'Enquiry not found', HTTP_STATUS.NOT_FOUND);
+        if (item) {
+          item.status = status || item.status;
+          updated = item;
         }
-        item.status = status || item.status;
-        updated = item;
+      }
+
+      if (!updated) {
+        return sendError(res, 'Enquiry not found', HTTP_STATUS.NOT_FOUND);
       }
 
       return sendSuccess(res, updated, 'Enquiry status updated');
@@ -132,7 +167,14 @@ export const enquiryController = {
       const { id } = req.params;
       try {
         if (prisma.enquiry) {
-          await prisma.enquiry.delete({ where: { id } });
+          let target = await prisma.enquiry.findUnique({ where: { id } });
+          if (!target) {
+            const all = await prisma.enquiry.findMany();
+            target = all.find(e => e.id === id);
+          }
+          if (target) {
+            await prisma.enquiry.delete({ where: { id: target.id } });
+          }
         }
       } catch (dbErr) {
         console.warn('Prisma enquiry delete fallback:', dbErr.message);

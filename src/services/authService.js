@@ -14,7 +14,7 @@ export const authService = {
   /**
    * Request OTP — Sends code via email without touching DB
    */
-  requestOTP: async ({ email, name }) => {
+  requestOTP: async ({ email, name, phone }) => {
     const normalizedEmail = email.toLowerCase().trim();
 
     const existing = await authRepository.findByEmail(normalizedEmail);
@@ -30,6 +30,7 @@ export const authService = {
     pendingOTPStore.set(normalizedEmail, {
       otp,
       name: name || 'Valued User',
+      phone: phone || null,
       expiresAt,
       verified: false,
     });
@@ -77,7 +78,7 @@ export const authService = {
   /**
    * Register User — ONLY creates user in DB after OTP is verified & submit form is clicked
    */
-  register: async ({ name, email, password, otp }) => {
+  register: async ({ name, email, password, phone, otp }) => {
     const normalizedEmail = email.toLowerCase().trim();
 
     const existing = await authRepository.findByEmail(normalizedEmail);
@@ -116,6 +117,7 @@ export const authService = {
       user = await authRepository.update(existing.id, {
         name: name || record.name,
         password: hashedPassword,
+        phone: phone ? phone.trim() : (record?.phone || null),
         isEmailVerified: true,
         verificationOTP: null,
         otpExpiresAt: null,
@@ -125,6 +127,7 @@ export const authService = {
         name: name || record.name,
         email: normalizedEmail,
         password: hashedPassword,
+        phone: phone ? phone.trim() : (record?.phone || null),
         isEmailVerified: true,
         verificationOTP: null,
         otpExpiresAt: null,
@@ -174,8 +177,8 @@ export const authService = {
     const normalizedEmail = email.toLowerCase().trim();
     const user = await authRepository.findByEmail(normalizedEmail);
     if (!user) {
-      const err = new Error('Invalid email or password');
-      err.statusCode = HTTP_STATUS.UNAUTHORIZED;
+      const err = new Error('Account not found. Please create an account first.');
+      err.statusCode = HTTP_STATUS.NOT_FOUND;
       throw err;
     }
     const isMatch = await bcrypt.compare(password, user.password);
