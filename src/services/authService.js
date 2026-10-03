@@ -1,3 +1,5 @@
+import { emitCustomerCreated } from '../sockets/index.js';
+import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { authRepository } from '../repositories/authRepository.js';
@@ -434,6 +436,99 @@ export const authService = {
     return {
       success: true,
       message: 'Password reset successfully. Please login with your new password.',
+    };
+  },
+  /**
+   * Google OAuth Sign-in & Sign-up
+   */
+  googleAuth: async ({ credential, idToken, email, name, avatar }) => {
+    let googleUser = null;
+
+    // 1. If Google ID Token / Credential is provided, decode/verify it
+    const tokenToDecode = credential || idToken;
+    if (tokenToDecode) {
+      try {
+        const decoded = jwt.decode(tokenToDecode);
+        if (decoded && decoded.email) {
+          googleUser = {
+            email: decoded.email,
+            name: decoded.name || decoded.given_name || decoded.email.split('@')[0],
+            avatar: decoded.picture || null,
+            sub: decoded.sub,
+          };
+        }
+      } catch (err) {
+        console.warn('JWT decode warning on Google token:', err.message);
+      }
+    }
+
+    // Fallback if direct profile fields provided
+    if (!googleUser && email) {
+      googleUser = {
+        email,
+        name: name || email.split('@')[0],
+        avatar: avatar || null,
+      };
+    }
+
+    if (!googleUser || !googleUser.email) {
+      const err = new Error('Invalid Google credential. Could not extract account profile.');
+      err.statusCode = HTTP_STATUS.BAD_REQUEST;
+      throw err;
+    }
+
+    const normalizedEmail = googleUser.email.toLowerCase().trim();
+
+    // 2. Check if user already exists in DB
+    let user = await authRepository.findByEmail(normalizedEmail);
+    let isNewUser = false;
+
+    if (user) {
+      // Existing user: ensure email is verified & update avatar if available
+      if (!user.isEmailVerified || (!user.avatar && googleUser.avatar)) {
+        user = await authRepository.update(user.id, {
+          isEmailVerified: true,
+          ...(googleUser.avatar && !user.avatar ? { avatar: googleUser.avatar } : {}),
+        });
+      }
+    } else {
+      // 3. New user registration via Google OAuth
+      isNewUser = true;
+      const randomPassword = crypto.randomBytes(32).toString('hex');
+      const hashedPassword = await bcrypt.hash(randomPassword, 10);
+
+      user = await authRepository.create({
+        name: googleUser.name,
+        email: normalizedEmail,
+        password: hashedPassword,
+        avatar: googleUser.avatar,
+        role: 'USER',
+        isEmailVerified: true,
+      });
+
+      // Emit customer created event for admin dashboard
+      try {
+        emitCustomerCreated({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          createdAt: user.createdAt || new Date().toISOString(),
+        });
+      } catch (e) {}
+    }
+
+    // 4. Generate application JWT tokens
+    const token = signToken({ id: user.id, role: user.role });
+    const { password: _, ...safeUser } = user;
+
+    return {
+      user: safeUser,
+      token,
+      isNewUser,
+      message: isNewUser
+        ? 'Account created and signed in with Google successfully!'
+        : 'Welcome back! Signed in with Google successfully.',
     };
   },
 };

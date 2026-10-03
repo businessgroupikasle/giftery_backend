@@ -56,3 +56,6 @@ coverage/
 
 # ── Local runner helper ───────────────────────────────────────
 powershell.cmd
+
+# ── Playwright MCP ────────────────────────────────────────
+.playwright-mcp/

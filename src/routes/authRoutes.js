@@ -11,6 +11,7 @@ router.post('/request-otp',       authLimiter,                                  
 router.post('/register',          authLimiter, validate(registerSchema),        authController.register);
 router.post('/verify-email',      authLimiter,                                  authController.verifyEmail);
 router.post('/resend-otp',        authLimiter,                                  authController.resendOTP);
+router.post('/google',            authLimiter,                                  authController.googleAuth);
 router.post('/login',             authLimiter, validate(loginSchema),           authController.login);
 router.post('/forgot-password',   authLimiter, validate(forgotPasswordSchema),   authController.forgotPassword);
 router.post('/verify-reset-otp',  authLimiter, validate(verifyResetOtpSchema),  authController.verifyResetOTP);
