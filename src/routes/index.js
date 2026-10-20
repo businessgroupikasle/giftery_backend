@@ -17,6 +17,7 @@ import uploadRoutes    from './uploadRoutes.js';
 import addressRoutes  from './addressRoutes.js';
 import settingRoutes   from './settingRoutes.js';
 import paymentRoutes   from './paymentRoutes.js';
+import couponRoutes    from './couponRoutes.js';
 
 const router = Router();
 
@@ -41,5 +42,6 @@ router.use('/uploads',    uploadRoutes);
 router.use('/upload',     uploadRoutes);
 router.use('/settings',   settingRoutes);
 router.use('/payments',   paymentRoutes);
+router.use('/coupons',    couponRoutes);
 
 export default router;
