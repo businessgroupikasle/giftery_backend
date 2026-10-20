@@ -32,9 +32,12 @@ const productSelect = {
   _count: { select: { reviews: true } },
 };
 
+// Storefront listing pages only need card/filter fields, not the long text columns
+const { description, specifications, customization, shippingReturns, weight, ...productListSelect } = productSelect;
+
 export const productRepository = {
-  findMany: ({ skip, take, where, orderBy }) =>
-    prisma.product.findMany({ where, skip, take, orderBy, select: productSelect }),
+  findMany: ({ skip, take, where, orderBy, lite = false }) =>
+    prisma.product.findMany({ where, skip, take, orderBy, select: lite ? productListSelect : productSelect }),
 
   count: (where) => prisma.product.count({ where }),
 

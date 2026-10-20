@@ -5,6 +5,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 const router = Router();
 
 router.get('/', couponController.listActive);
+router.post('/validate', couponController.validate);
 router.get('/admin', authenticate, authorize('ADMIN'), couponController.listAdmin);
 router.post('/', authenticate, authorize('ADMIN'), couponController.create);
 router.put('/:id', authenticate, authorize('ADMIN'), couponController.update);

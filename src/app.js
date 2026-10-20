@@ -2,6 +2,7 @@ import 'express-async-errors';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import compression from 'compression';
 import morgan from 'morgan';
 import fs from 'fs';
 import path from 'path';
@@ -20,6 +21,9 @@ const app = express();
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
 }));
+// ── Compression (JSON/API responses; images are already compressed) ──
+app.use(compression());
+
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin) || origin === env.CORS_ORIGIN) {
@@ -69,7 +73,8 @@ if (fs.existsSync(seedAssetsDir)) {
     logger.warn(`Failed to copy seed assets to uploads directory: ${err.message}`);
   }
 }
-app.use('/uploads', express.static(uploadPath));
+// Cache uploaded images in the browser; ETag revalidation picks up any file that is replaced
+app.use('/uploads', express.static(uploadPath, { maxAge: '7d' }));
 
 // ── API Routes ──────────────────────────────────────────────────
 app.use('/api/v1', apiRoutes);

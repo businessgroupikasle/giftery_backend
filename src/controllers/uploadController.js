@@ -4,6 +4,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
 import { env } from '../config/env.js';
 import { fileUploadHelper } from '../helpers/fileUpload.js';
+import { optimizeUploadedFile, saveOptimizedImage, isOptimizableImage } from '../helpers/imageOptimizer.js';
 
 const getUploadDir = () => {
   return path.isAbsolute(env.UPLOAD_DIR)
@@ -12,7 +13,7 @@ const getUploadDir = () => {
 };
 
 export const uploadController = {
-  uploadSingle: (req, res, next) => {
+  uploadSingle: async (req, res, next) => {
     try {
       const uploadDir = getUploadDir();
       if (!fs.existsSync(uploadDir)) {
@@ -20,18 +21,20 @@ export const uploadController = {
       }
 
       if (req.file) {
-        const relPath = req.file.filename;
-        const fileUrl = `/uploads/${relPath}`;
+        // Shrink and convert to WebP so product pages do not download full-size originals
+        const optimized = await optimizeUploadedFile(req.file);
+        const filename = optimized?.filename ?? req.file.filename;
+        const fileUrl = `/uploads/${filename}`;
 
-        if (!fs.existsSync(path.join(uploadDir, relPath))) {
+        if (!fs.existsSync(path.join(path.dirname(req.file.path), filename))) {
           return sendError(res, 'File upload verification failed', HTTP_STATUS.INTERNAL_SERVER_ERROR);
         }
 
         return sendSuccess(res, {
           url: fileUrl,
-          filename: req.file.filename,
-          size: req.file.size,
-          mimetype: req.file.mimetype
+          filename,
+          size: optimized?.size ?? req.file.size,
+          mimetype: optimized?.mimetype ?? req.file.mimetype
         }, 'Image uploaded successfully', HTTP_STATUS.CREATED);
       }
 
@@ -43,18 +46,24 @@ export const uploadController = {
           }
 
           const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
-          const base64Data = matches[2];
-          const filename = `product-${Date.now()}-${Math.round(Math.random() * 1e6)}.${ext}`;
+          const imageBuffer = Buffer.from(matches[2], 'base64');
+          const baseName = `product-${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+
+          // Prefer an optimized WebP; fall back to the original bytes if it cannot be processed
+          const optimized = isOptimizableImage(`image/${matches[1]}`)
+            ? await saveOptimizedImage(imageBuffer, uploadDir, baseName)
+            : null;
+          const filename = optimized?.filename ?? `${baseName}.${ext}`;
           const filePath = path.join(uploadDir, filename);
 
-          fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+          if (!optimized) fs.writeFileSync(filePath, imageBuffer);
 
           if (!fs.existsSync(filePath)) {
             return sendError(res, 'Base64 image save failed', HTTP_STATUS.INTERNAL_SERVER_ERROR);
           }
 
           const fileUrl = `/uploads/${filename}`;
-          return sendSuccess(res, { url: fileUrl, filename, size: Buffer.from(base64Data, 'base64').length }, 'Image uploaded successfully', HTTP_STATUS.CREATED);
+          return sendSuccess(res, { url: fileUrl, filename, size: optimized?.size ?? imageBuffer.length }, 'Image uploaded successfully', HTTP_STATUS.CREATED);
         } catch (err) {
           return sendError(res, `Base64 upload error: ${err.message}`, HTTP_STATUS.BAD_REQUEST);
         }
@@ -66,7 +75,7 @@ export const uploadController = {
     }
   },
 
-  uploadMultiple: (req, res, next) => {
+  uploadMultiple: async (req, res, next) => {
     try {
       if (!req.files || req.files.length === 0) {
         return sendError(res, 'No files provided', HTTP_STATUS.BAD_REQUEST);
@@ -76,22 +85,23 @@ export const uploadController = {
       const results = [];
       const failed = [];
 
-      req.files.forEach(file => {
-        const relPath = file.filename;
-        const filePath = path.join(uploadDir, relPath);
+      for (const file of req.files) {
+        const optimized = await optimizeUploadedFile(file);
+        const relPath = optimized?.filename ?? file.filename;
+        const filePath = path.join(path.dirname(file.path), relPath);
 
         if (!fs.existsSync(filePath)) {
           failed.push({ filename: file.filename, reason: 'File verification failed' });
-          return;
+          continue;
         }
 
         results.push({
           url: `/uploads/${relPath}`,
-          filename: file.filename,
-          size: file.size,
-          mimetype: file.mimetype,
+          filename: relPath,
+          size: optimized?.size ?? file.size,
+          mimetype: optimized?.mimetype ?? file.mimetype,
         });
-      });
+      }
 
       if (results.length === 0) {
         return sendError(res, 'All files failed to upload', HTTP_STATUS.BAD_REQUEST);

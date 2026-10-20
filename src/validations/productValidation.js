@@ -40,4 +40,5 @@ export const productQuerySchema = z.object({
   sort: z.enum(['price_asc', 'price_desc', 'newest', 'rating', 'featured']).optional().default('newest'),
   featured: z.string().optional(),
   showAll: z.string().optional(),
+  view: z.enum(['list']).optional(),
 });

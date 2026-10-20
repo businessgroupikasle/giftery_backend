@@ -30,6 +30,32 @@ const writeCoupons = (coupons) => {
   fs.renameSync(temporaryFile, file);
 };
 
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+const todayString = () => {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+};
+
+// Dates are plain YYYY-MM-DD strings; the expiry date itself is still valid
+const getValidity = (coupon) => {
+  const today = todayString();
+  if (coupon.expiryDate && today > coupon.expiryDate) return 'Expired';
+  if (coupon.startDate && today < coupon.startDate) return 'Upcoming';
+  return 'Valid';
+};
+
+const withValidity = (coupon) => ({ ...coupon, validity: getValidity(coupon) });
+
+const readOptionalDate = (value, fallback) => {
+  const raw = value === undefined ? fallback : value;
+  if (raw === undefined || raw === null || raw === '') return { value: null };
+  const text = String(raw).trim();
+  if (!DATE_ONLY.test(text) || Number.isNaN(Date.parse(`${text}T00:00:00Z`))) return { error: true };
+  return { value: text };
+};
+
 const normalizeCoupon = (body, existing = {}) => {
   const code = String(body.code ?? existing.code ?? '').trim().toUpperCase();
   const discountType = String(body.discountType ?? existing.discountType ?? '').toLowerCase();
@@ -49,6 +75,14 @@ const normalizeCoupon = (body, existing = {}) => {
     return { error: 'Status must be Active or Inactive' };
   }
 
+  const startDate = readOptionalDate(body.startDate, existing.startDate);
+  if (startDate.error) return { error: 'Start date must be a valid date (YYYY-MM-DD)' };
+  const expiryDate = readOptionalDate(body.expiryDate, existing.expiryDate);
+  if (expiryDate.error) return { error: 'Expiry date must be a valid date (YYYY-MM-DD)' };
+  if (startDate.value && expiryDate.value && expiryDate.value < startDate.value) {
+    return { error: 'Expiry date cannot be before the start date' };
+  }
+
   const cleanValue = Number(discountValue.toFixed(2));
   return {
     value: {
@@ -59,6 +93,8 @@ const normalizeCoupon = (body, existing = {}) => {
       discount: discountType === 'percent' ? `${cleanValue}% OFF` : `₹${cleanValue.toLocaleString('en-IN')} OFF`,
       category: String(body.category ?? existing.category ?? 'All Products').trim() || 'All Products',
       status,
+      startDate: startDate.value,
+      expiryDate: expiryDate.value,
       source: 'admin',
     },
   };
@@ -66,12 +102,34 @@ const normalizeCoupon = (body, existing = {}) => {
 
 export const couponController = {
   listActive: (req, res) => {
-    const coupons = readCoupons().filter((coupon) => coupon.status === 'Active');
+    const coupons = readCoupons()
+      .filter((coupon) => coupon.status === 'Active' && getValidity(coupon) === 'Valid')
+      .map(withValidity);
     sendSuccess(res, coupons, 'Active coupons retrieved');
   },
 
+  // Checkout check: unknown codes are 404, inactive ones are rejected, only active coupons are returned
+  validate: (req, res) => {
+    const code = String(req.body?.code ?? '').trim().toUpperCase();
+    if (!code) return sendError(res, 'Please enter a coupon code', 400);
+
+    const coupon = readCoupons().find((item) => item.code === code);
+    if (!coupon) return sendError(res, `Invalid coupon code "${code}"`, 404);
+    if (coupon.status !== 'Active') {
+      return sendError(res, 'This coupon is inactive and cannot be applied.', 400);
+    }
+    const validity = getValidity(coupon);
+    if (validity === 'Expired') {
+      return sendError(res, 'This coupon has expired and cannot be applied.', 400);
+    }
+    if (validity === 'Upcoming') {
+      return sendError(res, `This coupon is not valid yet. It starts on ${coupon.startDate}.`, 400);
+    }
+    sendSuccess(res, withValidity(coupon), 'Coupon is valid');
+  },
+
   listAdmin: (req, res) => {
-    sendSuccess(res, readCoupons(), 'Coupons retrieved');
+    sendSuccess(res, readCoupons().map(withValidity), 'Coupons retrieved');
   },
 
   create: (req, res) => {
@@ -89,7 +147,7 @@ export const couponController = {
       updatedAt: new Date().toISOString(),
     };
     writeCoupons([coupon, ...coupons]);
-    sendSuccess(res, coupon, 'Coupon created successfully', 201);
+    sendSuccess(res, withValidity(coupon), 'Coupon created successfully', 201);
   },
 
   update: (req, res) => {
@@ -105,7 +163,7 @@ export const couponController = {
 
     coupons[index] = { ...normalized.value, updatedAt: new Date().toISOString() };
     writeCoupons(coupons);
-    sendSuccess(res, coupons[index], 'Coupon updated successfully');
+    sendSuccess(res, withValidity(coupons[index]), 'Coupon updated successfully');
   },
 
   remove: (req, res) => {

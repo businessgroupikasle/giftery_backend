@@ -96,7 +96,7 @@ const sanitizeProductData = (inputData = {}) => {
 
 export const productService = {
   getAll: async (query) => {
-    const { page, limit, search, categoryId, subCategoryId, minPrice, maxPrice, sort, featured, showAll } = query;
+    const { page, limit, search, categoryId, subCategoryId, minPrice, maxPrice, sort, featured, showAll, view } = query;
 
     const andConditions = [];
 
@@ -153,6 +153,7 @@ export const productService = {
       take: meta.take,
       where,
       orderBy: sortMap[sort] || sortMap.newest,
+      lite: view === 'list',
     });
 
     return { data, meta };
