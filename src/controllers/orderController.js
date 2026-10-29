@@ -1,5 +1,5 @@
 import { orderService } from '../services/orderService.js';
-import { sendSuccess } from '../utils/response.js';
+import { sendSuccess, sendError } from '../utils/response.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
 import { emitOrderCreated } from '../sockets/index.js';
 import prisma from '../config/db.js';
@@ -56,7 +56,10 @@ export const orderController = {
       });
 
       sendSuccess(res, { order }, 'Order placed successfully', HTTP_STATUS.CREATED);
-    } catch (err) { next(err); }
+    } catch (err) {
+      if (err.pricing) return sendError(res, err.message, 409, { code: 'PRICE_MISMATCH', pricing: err.pricing });
+      next(err);
+    }
   },
 
   updateStatus: async (req, res, next) => {

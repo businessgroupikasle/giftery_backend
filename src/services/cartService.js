@@ -1,12 +1,18 @@
 import { cartRepository } from '../repositories/cartRepository.js';
 import prisma from '../config/db.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
+import { validateSavedCustomization } from './customizationService.js';
 
 const getOrCreateCart = async (userId) => {
-  let cart = await cartRepository.findByUserId(userId);
-  if (!cart) cart = await cartRepository.createForUser(userId);
-  return cart;
+  await prisma.cart.upsert({ where: { userId }, create: { userId }, update: {} });
+  return cartRepository.findByUserId(userId);
 };
+
+const withCart = (userId, action) => prisma.$transaction(async (tx) => {
+  await tx.$queryRaw`SELECT id FROM "users" WHERE id = ${userId} FOR UPDATE`;
+  const cart = await tx.cart.upsert({ where: { userId }, create: { userId }, update: {}, include: { items: { include: { product: true } } } });
+  return action(tx, cart);
+});
 
 export const cartService = {
   getCart: async (userId) => {
@@ -15,8 +21,10 @@ export const cartService = {
     return { ...cart, total: Math.round(total * 100) / 100 };
   },
 
-  addItem: async (userId, { productId, quantity }) => {
-    const product = await prisma.product.findUnique({ where: { id: productId } });
+  addItem: async (userId, { productId, quantity, customization }) => {
+    await withCart(userId, async (tx, cart) => {
+    if (customization) await validateSavedCustomization(userId, productId, customization, tx);
+    const product = await tx.product.findUnique({ where: { id: productId } });
     if (!product) {
       const err = new Error('Product not found');
       err.statusCode = HTTP_STATUS.NOT_FOUND;
@@ -28,30 +36,44 @@ export const cartService = {
       throw err;
     }
 
-    const cart = await getOrCreateCart(userId);
-    const existing = await cartRepository.findItem(cart.id, productId);
+    const totalQuantity = cart.items.filter((item) => item.productId === productId).reduce((sum, item) => sum + item.quantity, quantity);
+    if (totalQuantity > product.stock) {
+      const err = new Error(`Only ${product.stock} units available`);
+      err.statusCode = HTTP_STATUS.BAD_REQUEST;
+      throw err;
+    }
+    const existing = customization ? null : cart.items.find((item) => item.productId === productId && item.customization === null);
 
     if (existing) {
-      await cartRepository.updateItem(existing.id, existing.quantity + quantity);
+      await tx.cartItem.update({ where: { id: existing.id }, data: { quantity: existing.quantity + quantity } });
     } else {
-      await cartRepository.addItem(cart.id, productId, quantity);
+      await tx.cartItem.create({ data: { cartId: cart.id, productId, quantity, ...(customization ? { customization } : {}) } });
     }
+    });
     return cartService.getCart(userId);
   },
 
   updateItem: async (userId, itemId, { quantity }) => {
-    await cartRepository.updateItem(itemId, quantity);
+    await withCart(userId, async (tx, cart) => {
+    const item = cart.items.find((entry) => entry.id === itemId);
+    if (!item) { const err = new Error('Cart item not found'); err.statusCode = 404; throw err; }
+    const total = cart.items.filter((entry) => entry.productId === item.productId && entry.id !== itemId).reduce((sum, entry) => sum + entry.quantity, quantity);
+    if (total > item.product.stock) { const err = new Error(`Only ${item.product.stock} units available`); err.statusCode = 400; throw err; }
+    await tx.cartItem.update({ where: { id: itemId }, data: { quantity } });
+    });
     return cartService.getCart(userId);
   },
 
   removeItem: async (userId, itemId) => {
-    await cartRepository.removeItem(itemId);
+    await withCart(userId, async (tx, cart) => {
+    if (!cart.items.some((item) => item.id === itemId)) { const err = new Error('Cart item not found'); err.statusCode = 404; throw err; }
+    await tx.cartItem.delete({ where: { id: itemId } });
+    });
     return cartService.getCart(userId);
   },
 
   clearCart: async (userId) => {
-    const cart = await getOrCreateCart(userId);
-    await cartRepository.clearCart(cart.id);
+    await withCart(userId, (tx, cart) => tx.cartItem.deleteMany({ where: { cartId: cart.id } }));
     return cartService.getCart(userId);
   },
 };

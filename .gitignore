@@ -26,11 +26,16 @@ out/
 vite.config.js.timestamp-*
 
 # ── Prisma ────────────────────────────────────────────────────
-prisma/migrations/
+prisma/migrations/*
+!prisma/migrations/20260826081414_/
+!prisma/migrations/20261028000000_customization/
+!prisma/migrations/20261028010000_secure_payment/
+!prisma/migrations/migration_lock.toml
 
 # ── Uploads ───────────────────────────────────────────────────
 uploads/
 !uploads/.gitkeep
+private-artwork/
 
 # ── Logs ──────────────────────────────────────────────────────
 logs/

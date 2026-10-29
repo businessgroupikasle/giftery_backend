@@ -1,4 +1,5 @@
 import prisma from '../config/db.js';
+import { Prisma } from '@prisma/client';
 
 export const cartRepository = {
   findByUserId: (userId) =>
@@ -18,10 +19,10 @@ export const cartRepository = {
   createForUser: (userId) => prisma.cart.create({ data: { userId }, include: { items: true } }),
 
   findItem: (cartId, productId) =>
-    prisma.cartItem.findUnique({ where: { cartId_productId: { cartId, productId } } }),
+    prisma.cartItem.findFirst({ where: { cartId, productId, customization: { equals: Prisma.DbNull } } }),
 
-  addItem: (cartId, productId, quantity) =>
-    prisma.cartItem.create({ data: { cartId, productId, quantity } }),
+  addItem: (cartId, productId, quantity, customization) =>
+    prisma.cartItem.create({ data: { cartId, productId, quantity, ...(customization ? { customization } : {}) } }),
 
   updateItem: (id, quantity) => prisma.cartItem.update({ where: { id }, data: { quantity } }),
 

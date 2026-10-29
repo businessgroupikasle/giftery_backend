@@ -16,12 +16,14 @@ const shippingAddressSchema = z.object({
 }).passthrough();
 
 export const createOrderSchema = z.object({
-  shippingAddress: shippingAddressSchema.or(z.any()),
-  items: z.array(z.any()).optional(),
+  shippingAddress: shippingAddressSchema,
+  items: z.array(z.object({ productId: z.string().min(1).optional(), id: z.string().min(1).optional(), quantity: z.number().int().min(1).max(10000), customization: z.record(z.any()).nullable().optional() }).refine((item) => item.productId || item.id)).min(1).max(100).optional(),
   totalAmount: z.number().optional(),
-  paymentMethod: z.string().optional(),
+  expectedTotal: z.number().finite().nonnegative().optional(),
+  couponCode: z.string().trim().max(16).nullable().optional(),
+  paymentMethod: z.preprocess((value) => typeof value === 'string' ? value.toUpperCase() : value, z.enum(['COD', 'RAZORPAY']).default('COD')),
   notes: z.string().max(500).optional(),
-}).passthrough();
+}).passthrough().refine((body) => body.expectedTotal !== undefined || body.totalAmount !== undefined, { message: 'Expected total is required', path: ['expectedTotal'] });
 
 export const updateOrderStatusSchema = z.object({
   status: z.preprocess(

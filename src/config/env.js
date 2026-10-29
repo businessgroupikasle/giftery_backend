@@ -24,6 +24,7 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().email().optional(),
   EMAIL_FROM_NAME: z.string().default('GIFTERY'),
   UPLOAD_DIR: z.string().default('uploads'),
+  PRIVATE_ARTWORK_DIR: z.string().default('private-artwork'),
   MAX_FILE_SIZE: z.string().default('5242880').transform(Number),
   ALLOWED_FILE_TYPES: z.string().default('image/jpeg,image/png,image/webp'),
   RATE_LIMIT_WINDOW_MS: z.string().default('900000').transform(Number),

@@ -48,6 +48,18 @@ const getValidity = (coupon) => {
 
 const withValidity = (coupon) => ({ ...coupon, validity: getValidity(coupon) });
 
+export const resolveCoupon = (code) => {
+  const normalized = String(code || '').trim().toUpperCase();
+  if (!normalized) return null;
+  const coupon = readCoupons().find((item) => item.code === normalized);
+  if (!coupon || coupon.status !== 'Active' || getValidity(coupon) !== 'Valid') {
+    const error = new Error('Coupon is invalid, inactive or outside its validity period');
+    error.statusCode = 400;
+    throw error;
+  }
+  return coupon;
+};
+
 const readOptionalDate = (value, fallback) => {
   const raw = value === undefined ? fallback : value;
   if (raw === undefined || raw === null || raw === '') return { value: null };
