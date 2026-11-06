@@ -16,8 +16,9 @@ const shippingAddressSchema = z.object({
 }).passthrough();
 
 export const createOrderSchema = z.object({
+  orderNumber: z.string().trim().regex(/^ORD-\d{4}-[A-Z0-9-]+$/i, 'Invalid order number').transform((value) => value.toUpperCase()),
   shippingAddress: shippingAddressSchema,
-  items: z.array(z.object({ productId: z.string().min(1).optional(), id: z.string().min(1).optional(), quantity: z.number().int().min(1).max(10000), customization: z.record(z.any()).nullable().optional() }).refine((item) => item.productId || item.id)).min(1).max(100).optional(),
+  items: z.array(z.object({ productId: z.string().min(1).optional(), id: z.string().min(1).optional(), quantity: z.number().int().min(1).max(10000), customizationId: z.string().min(1).max(100).nullable().optional(), customization: z.record(z.any()).nullable().optional() }).refine((item) => item.productId || item.id)).min(1).max(100).optional(),
   totalAmount: z.number().optional(),
   expectedTotal: z.number().finite().nonnegative().optional(),
   couponCode: z.string().trim().max(16).nullable().optional(),

@@ -1,3 +1,4 @@
+import { normalizeContactPhone } from '../utils/phone.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
 import { emitEnquiryCreated } from '../sockets/index.js';
@@ -10,9 +11,15 @@ export const enquiryController = {
   // Public: Submit enquiry from contact form
   createEnquiry: async (req, res) => {
     try {
-      const { name, email, phone, subject, message } = req.body;
+      const { name, email, subject, message } = req.body;
       if (!name || !email || !message) {
         return sendError(res, 'Name, email, and message are required', HTTP_STATUS.BAD_REQUEST);
+      }
+      let phone;
+      try {
+        phone = normalizeContactPhone(req.body.phone);
+      } catch (err) {
+        return sendError(res, err.message, HTTP_STATUS.BAD_REQUEST);
       }
 
       const year = new Date().getFullYear();

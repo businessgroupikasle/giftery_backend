@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth.js';
 import { sendSuccess } from '../utils/response.js';
 import prisma from '../config/db.js';
+import { normalizeContactPhone } from '../utils/phone.js';
 
 const router = Router();
 
@@ -67,18 +68,18 @@ router.get('/:id', async (req, res, next) => {
 router.post('/', async (req, res, next) => {
   try {
     const userId = req.user.id || req.user.userId;
-    const { fullName, phone, street, addressLine1, landmark, city, state, zip, pincode, country, isDefault } = req.body;
+    const { fullName, street, addressLine1, landmark, city, state, zip, pincode, country, isDefault } = req.body;
 
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    if (phone) {
-      const cleanPhoneDigits = String(phone).replace(/[^0-9]/g, '');
-      if (cleanPhoneDigits.length < 10 || cleanPhoneDigits.length > 13) {
-        return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit phone number' });
-      }
+    let phone;
+    try {
+      phone = normalizeContactPhone(req.body.phone);
+    } catch (err) {
+      return res.status(400).json({ success: false, message: err.message });
     }
 
     if (zip || pincode) {
@@ -137,17 +138,17 @@ router.put('/:id', async (req, res, next) => {
   try {
     const userId = req.user.id || req.user.userId;
     const { id } = req.params;
-    const { fullName, phone, street, addressLine1, landmark, city, state, zip, pincode, country, isDefault } = req.body;
+    const { fullName, street, addressLine1, landmark, city, state, zip, pincode, country, isDefault } = req.body;
 
     const existing = await prisma.address.findFirst({
       where: { id, userId },
     });
 
-    if (phone) {
-      const cleanPhoneDigits = String(phone).replace(/[^0-9]/g, '');
-      if (cleanPhoneDigits.length < 10 || cleanPhoneDigits.length > 13) {
-        return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit phone number' });
-      }
+    let phone;
+    try {
+      phone = normalizeContactPhone(req.body.phone);
+    } catch (err) {
+      return res.status(400).json({ success: false, message: err.message });
     }
 
     if (zip || pincode) {

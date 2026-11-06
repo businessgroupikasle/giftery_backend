@@ -22,6 +22,7 @@ const productSelect = {
   subCategoryId: true,
   specifications: true,
   customization: true,
+  customizationConfig: true,
   shippingReturns: true,
   tags: true,
   rating: true,
@@ -33,7 +34,7 @@ const productSelect = {
 };
 
 // Storefront listing pages only need card/filter fields, not the long text columns
-const { description, specifications, customization, shippingReturns, weight, ...productListSelect } = productSelect;
+const { description, specifications, customization, customizationConfig, shippingReturns, weight, ...productListSelect } = productSelect;
 
 export const productRepository = {
   findMany: ({ skip, take, where, orderBy, lite = false }) =>

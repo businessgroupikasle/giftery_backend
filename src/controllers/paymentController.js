@@ -2,7 +2,10 @@ import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import prisma from '../config/db.js';
 import { env } from '../config/env.js';
+import { logger } from '../config/logger.js';
 import { sendSuccess, sendError } from '../utils/response.js';
+import { sendAdminOrderNotification, sendOrderConfirmation } from '../helpers/email.js';
+import { emitOrderCreated } from '../sockets/index.js';
 
 const gateway = () => {
   const key_id = env.RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID;
@@ -14,6 +17,19 @@ const gateway = () => {
   }
   return { client: new Razorpay({ key_id, key_secret }), key_id, key_secret };
 };
+
+/**
+ * The Razorpay SDK rejects with a plain { statusCode, error } object. That status describes our
+ * API keys or request, not the customer's session, so it must never reach the browser as-is:
+ * the storefront treats any 401 as "signed out" and sends the customer to the login page.
+ */
+export function toGatewayError(err) {
+  if (err instanceof Error || !err?.statusCode) return err;
+  logger.error(`Razorpay rejected the request: ${err.statusCode} ${err.error?.code || ''} ${err.error?.description || ''}`.trim());
+  const gatewayError = new Error('The payment gateway is unavailable right now. Please try again or choose Cash on Delivery.');
+  gatewayError.statusCode = 502;
+  return gatewayError;
+}
 
 export function validSignature(secret, orderId, paymentId, signature) {
   if (typeof signature !== 'string' || !/^[a-fA-F0-9]{64}$/.test(signature)) return false;
@@ -47,7 +63,7 @@ export const paymentController = {
         return { orderId: gatewayOrderId, amount, currency: 'INR', keyId: key_id };
       }, { timeout: 30000 });
       return sendSuccess(res, result, 'Razorpay order created successfully');
-    } catch (err) { next(err); }
+    } catch (err) { next(toGatewayError(err)); }
   },
 
   verifyRazorpayPayment: async (req, res, next) => {
@@ -57,13 +73,16 @@ export const paymentController = {
         return sendError(res, 'Missing payment verification parameters', 400);
       }
       const { client, key_secret } = gateway();
-      const order = await prisma.order.findFirst({ where: { id: orderId, userId: req.user.id }, include: { payment: true } });
+      const order = await prisma.order.findFirst({
+        where: { id: orderId, userId: req.user.id },
+        include: { payment: true, items: true, user: { select: { name: true, email: true } } },
+      });
       const payment = order?.payment;
       if (!payment || payment.method !== 'RAZORPAY' || payment.razorpayOrderId !== razorpay_order_id || !validSignature(key_secret, razorpay_order_id, razorpay_payment_id, razorpay_signature)) {
         return sendError(res, 'Invalid payment verification', 400);
       }
       if (payment.status === 'SUCCEEDED' && payment.razorpayPaymentId === razorpay_payment_id) {
-        return sendSuccess(res, { verified: true, paymentId: razorpay_payment_id, orderId: razorpay_order_id, status: 'SUCCESS' });
+        return sendSuccess(res, { verified: true, paymentId: razorpay_payment_id, orderId: razorpay_order_id, status: 'SUCCESS', paymentStatus: 'PAID', paymentMethod: 'RAZORPAY' });
       }
       if (payment.status !== 'PENDING' || order.status !== 'PENDING') return sendError(res, 'Order is not eligible for payment', 400);
       const providerPayment = await client.payments.fetch(razorpay_payment_id);
@@ -72,7 +91,43 @@ export const paymentController = {
       }
       const updated = await prisma.payment.updateMany({ where: { id: payment.id, status: 'PENDING', razorpayOrderId: razorpay_order_id, order: { status: 'PENDING' } }, data: { status: 'SUCCEEDED', razorpayPaymentId: razorpay_payment_id } });
       if (!updated.count) return sendError(res, 'Payment state changed; retry verification', 409);
-      return sendSuccess(res, { verified: true, paymentId: razorpay_payment_id, orderId: razorpay_order_id, status: 'SUCCESS' }, 'Razorpay payment verified successfully');
-    } catch (err) { next(err); }
+
+      const cartItems = order.items.map((item) => ({
+        productId: item.productId,
+        customizationId: item.customizationId || null,
+      }));
+      if (cartItems.length) {
+        await prisma.cartItem.deleteMany({
+          where: { cart: { userId: req.user.id }, OR: cartItems },
+        });
+      }
+
+      const customerName = order.user?.name || order.shippingAddress?.fullName || 'Customer';
+      const customerEmail = order.user?.email || order.shippingAddress?.email || '';
+      const paidOrder = {
+        ...order,
+        paymentMethod: 'RAZORPAY',
+        paymentStatus: 'PAID',
+        payment: { ...order.payment, status: 'SUCCEEDED' },
+      };
+      await Promise.allSettled([
+        sendOrderConfirmation(paidOrder, { name: customerName, email: customerEmail }),
+        sendAdminOrderNotification(paidOrder, { name: customerName, email: customerEmail }),
+      ]);
+      emitOrderCreated({
+        id: order.id,
+        orderId: order.orderNumber,
+        customer: customerName,
+        customerEmail,
+        amount: order.totalAmount,
+        totalAmount: order.totalAmount,
+        itemsCount: order.items.length,
+        items: order.items.map(({ customization, ...item }) => ({ ...item, isCustomized: Boolean(customization) })),
+        status: order.status,
+        createdAt: order.createdAt,
+      });
+
+      return sendSuccess(res, { verified: true, paymentId: razorpay_payment_id, orderId: razorpay_order_id, status: 'SUCCESS', paymentStatus: 'PAID', paymentMethod: 'RAZORPAY' }, 'Razorpay payment verified successfully');
+    } catch (err) { next(toGatewayError(err)); }
   },
 };

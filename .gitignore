@@ -30,6 +30,7 @@ prisma/migrations/*
 !prisma/migrations/20260826081414_/
 !prisma/migrations/20261028000000_customization/
 !prisma/migrations/20261028010000_secure_payment/
+!prisma/migrations/20261106000000_customization_studio/
 !prisma/migrations/migration_lock.toml
 
 # ── Uploads ───────────────────────────────────────────────────

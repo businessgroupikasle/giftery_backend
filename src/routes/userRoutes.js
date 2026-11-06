@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { authenticate } from '../middleware/auth.js';
 import { sendSuccess } from '../utils/response.js';
 import prisma from '../config/db.js';
+import { normalizeContactPhone } from '../utils/phone.js';
 
 const router = Router();
 
@@ -95,7 +96,7 @@ router.put('/profile', authenticate, async (req, res, next) => {
       where: { id: userId },
       data: {
         ...(name && { name: name.trim() }),
-        ...(phone !== undefined && { phone: phone.trim() }),
+        ...(phone !== undefined && { phone: normalizeContactPhone(phone) }),
       },
       select: {
         id: true, name: true, email: true, phone: true,
@@ -176,7 +177,8 @@ router.get('/address', authenticate, async (req, res, next) => {
 // ── 6. PUT /users/address — Save Delivery Address in DB ──
 router.put('/address', authenticate, async (req, res, next) => {
   try {
-    const { fullName, phone, street, addressLine1, landmark, city, state, zip, pincode, country } = req.body;
+    const { fullName, street, addressLine1, landmark, city, state, zip, pincode, country } = req.body;
+    const phone = normalizeContactPhone(req.body.phone);
     const userId = req.user.id || req.user.userId;
     const zipCode = zip || pincode || '600001';
 
@@ -304,7 +306,7 @@ const handleUserUpdate = async (req, res, next) => {
 
     const updateData = {};
     if (name && typeof name === 'string') updateData.name = name.trim();
-    if (phone !== undefined) updateData.phone = phone ? String(phone).trim() : null;
+    if (phone !== undefined) updateData.phone = normalizeContactPhone(phone);
     if (parsedActive !== undefined) updateData.isActive = parsedActive;
 
     const existingUser = await prisma.user.findFirst({

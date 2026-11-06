@@ -9,7 +9,7 @@ export const cartRepository = {
         items: {
           include: {
             product: {
-              select: { id: true, name: true, slug: true, price: true, images: true, stock: true },
+              select: { id: true, name: true, slug: true, price: true, images: true, stock: true, customizationConfig: true },
             },
           },
         },

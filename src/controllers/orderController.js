@@ -3,6 +3,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
 import { emitOrderCreated } from '../sockets/index.js';
 import prisma from '../config/db.js';
+import { sendAdminOrderNotification, sendOrderConfirmation } from '../helpers/email.js';
 
 export const orderController = {
   getMyOrders: async (req, res, next) => {
@@ -41,8 +42,13 @@ export const orderController = {
         }
       } catch (e) {}
 
-      // Emit Socket.IO event only after database transaction succeeds
-      emitOrderCreated({
+      if (String(req.body.paymentMethod || 'COD').toUpperCase() === 'COD') {
+        await Promise.allSettled([
+          sendOrderConfirmation(order, { name: customerName, email: customerEmail }),
+          sendAdminOrderNotification(order, { name: customerName, email: customerEmail }),
+        ]);
+
+        emitOrderCreated({
         id: order.id,
         orderId: order.id,
         customer: customerName,
@@ -50,10 +56,12 @@ export const orderController = {
         amount: order.totalAmount,
         totalAmount: order.totalAmount,
         itemsCount: order.items?.length || 1,
-        items: order.items,
+        // This event reaches every connected socket; private design details stay out of it.
+        items: order.items?.map(({ customization, ...item }) => ({ ...item, isCustomized: Boolean(customization) })),
         status: order.status || 'PENDING',
-        createdAt: order.createdAt || new Date().toISOString(),
-      });
+          createdAt: order.createdAt || new Date().toISOString(),
+        });
+      }
 
       sendSuccess(res, { order }, 'Order placed successfully', HTTP_STATUS.CREATED);
     } catch (err) {

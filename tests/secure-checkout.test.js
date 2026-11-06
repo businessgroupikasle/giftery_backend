@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import prisma from '../src/config/db.js';
 import { orderService } from '../src/services/orderService.js';
-import { validSignature } from '../src/controllers/paymentController.js';
+import { toGatewayError, validSignature } from '../src/controllers/paymentController.js';
 import { createOrderSchema } from '../src/validations/orderValidation.js';
 import { calculateOrderPricing } from '../src/services/orderPricing.js';
 
@@ -53,23 +53,50 @@ test('mismatch and disabled online payment cause no mutations', async () => {
   assert.equal(writes, 0);
 });
 
-test('buy-now customization must match saved draft with owned preview', async () => {
-  const design = { version: 1, previewAssetId: 'preview' };
-  let draft = { design };
+test('buy-now customization is rebuilt from a saved, owned design', async () => {
+  const saved = { id: 'd1', userId: 'u', productId: 'p', name: 'Mine', status: 'SAVED', previewAssetId: 'preview', assetIds: [], design: { version: 2, elements: [] } };
+  let row = saved;
   let owned = 1;
+  let created;
   prisma.$transaction = async (callback) => callback({
-    $queryRaw: async () => [], customizationAsset: { count: async () => owned }, customizationDraft: { findUnique: async () => draft },
-    product: { findUnique: async () => ({ price: 10, name: 'P', images: [], isActive: true }), updateMany: async () => ({ count: 1 }) },
-    order: { create: async ({ data }) => data },
+    $queryRaw: async () => [],
+    customizationAsset: { count: async () => owned, findMany: async () => [] },
+    customizationDesign: { findFirst: async ({ where }) => (row && where.userId === row.userId && where.id === row.id ? row : null), updateMany: async () => ({ count: 1 }) },
+    product: { findUnique: async () => ({ price: 10, name: 'P', images: [], isActive: true, customizationConfig: { chargePerUnit: 2 } }), updateMany: async () => ({ count: 1 }) },
+    order: { create: async ({ data }) => { created = data; return data; } },
   });
-  const input = { items: [{ productId: 'p', quantity: 1, customization: design }], expectedTotal: calculateOrderPricing(1000).totalAmount };
+  const input = { items: [{ productId: 'p', quantity: 1, customizationId: 'd1', customization: { name: 'tampered' } }], expectedTotal: calculateOrderPricing(1200).totalAmount };
   await orderService.createFromCart('u', input);
-  draft = { design: { ...design, other: true } };
+  const line = created.items.create[0];
+  assert.equal(line.customization.name, 'Mine');
+  assert.equal(line.customizationId, 'd1');
+  assert.equal(line.customizationCharge, 2);
+  assert.equal(line.customizationStatus, 'PENDING_REVIEW');
+  assert.equal(line.price, 12);
+  row = { ...saved, status: 'DRAFT' };
   await assert.rejects(orderService.createFromCart('u', input), /Save the current customization/);
-  draft = { design }; owned = 0;
+  row = { ...saved, productId: 'other' };
+  await assert.rejects(orderService.createFromCart('u', input), /different product/);
+  row = { ...saved, userId: 'someone-else' };
+  await assert.rejects(orderService.createFromCart('u', input), /Customization not found/);
+  row = saved; owned = 0;
   await assert.rejects(orderService.createFromCart('u', input), /asset not found/);
-  input.items[0].customization = { version: 1 };
-  await assert.rejects(orderService.createFromCart('u', input), /Save the current customization/);
+  owned = 1;
+  await assert.rejects(orderService.createFromCart('u', { items: [{ productId: 'p', quantity: 1, customization: { previewAssetId: 'preview' } }], expectedTotal: 1 }), /Save the current customization/);
+});
+
+test('a Razorpay rejection never reaches the browser as a sign-in failure', () => {
+  const rejectedKeys = toGatewayError({ statusCode: 401, error: { code: 'BAD_REQUEST_ERROR', description: 'Authentication failed' } });
+  assert.ok(rejectedKeys instanceof Error);
+  assert.equal(rejectedKeys.statusCode, 502);
+  assert.match(rejectedKeys.message, /payment gateway is unavailable/i);
+  assert.doesNotMatch(rejectedKeys.message, /Authentication failed/);
+  assert.equal(toGatewayError({ statusCode: 400, error: { code: 'BAD_REQUEST_ERROR' } }).statusCode, 502);
+
+  const appError = Object.assign(new Error('Order is not eligible for payment'), { statusCode: 400 });
+  assert.equal(toGatewayError(appError), appError, 'our own errors keep their status');
+  const expiredLogin = Object.assign(new Error('Token expired'), { statusCode: 401 });
+  assert.equal(toGatewayError(expiredLogin).statusCode, 401);
 });
 
 test('signature verification requires an exact HMAC and binding', () => {

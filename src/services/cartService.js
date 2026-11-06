@@ -1,7 +1,7 @@
 import { cartRepository } from '../repositories/cartRepository.js';
 import prisma from '../config/db.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
-import { validateSavedCustomization } from './customizationService.js';
+import { customizationCharge, loadPurchasableDesign } from './customizationService.js';
 
 const getOrCreateCart = async (userId) => {
   await prisma.cart.upsert({ where: { userId }, create: { userId }, update: {} });
@@ -17,13 +17,17 @@ const withCart = (userId, action) => prisma.$transaction(async (tx) => {
 export const cartService = {
   getCart: async (userId) => {
     const cart = await getOrCreateCart(userId);
-    const total = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-    return { ...cart, total: Math.round(total * 100) / 100 };
+    const items = cart.items.map(({ product: { customizationConfig, ...product }, ...item }) => {
+      const charge = customizationCharge({ customizationConfig }, Boolean(item.customization));
+      return { ...item, product, customizationCharge: charge, unitPrice: product.price + charge };
+    });
+    const total = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    return { ...cart, items, total: Math.round(total * 100) / 100 };
   },
 
-  addItem: async (userId, { productId, quantity, customization }) => {
+  addItem: async (userId, { productId, quantity, customizationId }) => {
     await withCart(userId, async (tx, cart) => {
-    if (customization) await validateSavedCustomization(userId, productId, customization, tx);
+    const customization = customizationId ? await loadPurchasableDesign(userId, productId, customizationId, tx) : null;
     const product = await tx.product.findUnique({ where: { id: productId } });
     if (!product) {
       const err = new Error('Product not found');
@@ -42,12 +46,14 @@ export const cartService = {
       err.statusCode = HTTP_STATUS.BAD_REQUEST;
       throw err;
     }
-    const existing = customization ? null : cart.items.find((item) => item.productId === productId && item.customization === null);
+    const existing = customization
+      ? cart.items.find((item) => item.customizationId === customizationId)
+      : cart.items.find((item) => item.productId === productId && item.customization === null);
 
     if (existing) {
-      await tx.cartItem.update({ where: { id: existing.id }, data: { quantity: existing.quantity + quantity } });
+      await tx.cartItem.update({ where: { id: existing.id }, data: { quantity: existing.quantity + quantity, ...(customization ? { customization } : {}) } });
     } else {
-      await tx.cartItem.create({ data: { cartId: cart.id, productId, quantity, ...(customization ? { customization } : {}) } });
+      await tx.cartItem.create({ data: { cartId: cart.id, productId, quantity, ...(customization ? { customization, customizationId } : {}) } });
     }
     });
     return cartService.getCart(userId);

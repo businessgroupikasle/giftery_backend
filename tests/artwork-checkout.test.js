@@ -14,7 +14,7 @@ const originalTransaction = prisma.$transaction;
 after(async () => { prisma.$transaction = originalTransaction; await rm(directory, { recursive: true, force: true }); });
 
 test('quota, private key, and failed metadata write cleanup', async () => {
-  let count = 100;
+  let count = 200;
   let key;
   const tx = { $queryRaw: async () => [], customizationAsset: {
     aggregate: async () => ({ _count: count, _sum: { size: 0 } }),

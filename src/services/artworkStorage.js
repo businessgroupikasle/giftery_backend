@@ -29,27 +29,50 @@ function filePath(key) {
   return path.join(root, key);
 }
 
-export async function storeArtwork(userId, mimeType, data) {
+const MAX_ASSETS_PER_USER = 200;
+const MAX_BYTES_PER_USER = 100 * 1024 * 1024;
+
+const writePrivateFile = async (filename, data) => {
+  const file = await open(filename, 'wx', 0o600);
+  try { await file.writeFile(data); } finally { await file.close(); }
+};
+
+/**
+ * Stores a validated image outside the public uploads directory and records it against its owner.
+ * `source` optionally keeps a scanned original (an SVG) next to the file the browser renders.
+ */
+export async function storeArtwork(userId, mimeType, data, { kind = 'LOGO', originalName = null, width = null, height = null, source = null } = {}) {
   const key = randomUUID();
-  const filename = filePath(key);
-  let written = false;
+  const sourceKey = source ? randomUUID() : null;
+  const written = [];
+  const totalSize = data.length + (source?.length || 0);
   try {
     return await prisma.$transaction(async (tx) => {
       await tx.$queryRaw`SELECT id FROM "users" WHERE id = ${userId} FOR UPDATE`;
       const usage = await tx.customizationAsset.aggregate({ where: { userId }, _sum: { size: true }, _count: true });
-      if (usage._count >= 100 || (usage._sum.size || 0) + data.length > 100 * 1024 * 1024) {
+      if (usage._count >= MAX_ASSETS_PER_USER || (usage._sum.size || 0) + totalSize > MAX_BYTES_PER_USER) {
         const error = new Error('Artwork storage quota exceeded'); error.statusCode = 413; throw error;
       }
       await ensurePrivateDirectory();
-      const file = await open(filename, 'wx', 0o600);
-      written = true;
-      try { await file.writeFile(data); } finally { await file.close(); }
-      return tx.customizationAsset.create({ data: { userId, mimeType, storageKey: key, size: data.length }, select: { id: true } });
+      await writePrivateFile(filePath(key), data);
+      written.push(filePath(key));
+      if (source) {
+        await writePrivateFile(filePath(sourceKey), source);
+        written.push(filePath(sourceKey));
+      }
+      return tx.customizationAsset.create({
+        data: { userId, mimeType, storageKey: key, size: totalSize, kind, originalName, width, height, sourceStorageKey: sourceKey },
+        select: { id: true, kind: true, originalName: true, mimeType: true, width: true, height: true, size: true, createdAt: true },
+      });
     });
   } catch (error) {
-    if (written) await unlink(filename).catch(() => {});
+    await Promise.all(written.map((filename) => unlink(filename).catch(() => {})));
     throw error;
   }
 }
 
 export const readArtwork = (key) => readFile(filePath(key));
+
+export const deleteArtwork = (key) => unlink(filePath(key)).catch((error) => {
+  if (error.code !== 'ENOENT') throw error;
+});

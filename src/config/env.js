@@ -23,6 +23,7 @@ const envSchema = z.object({
   SMTP_PASS: z.string().optional(),
   EMAIL_FROM: z.string().email().optional(),
   EMAIL_FROM_NAME: z.string().default('GIFTERY'),
+  ADMIN_NOTIFICATION_EMAIL: z.string().email().optional(),
   UPLOAD_DIR: z.string().default('uploads'),
   PRIVATE_ARTWORK_DIR: z.string().default('private-artwork'),
   MAX_FILE_SIZE: z.string().default('5242880').transform(Number),

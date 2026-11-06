@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { customizationConfigSchema } from './customizationValidation.js';
 
 export const createProductSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters').max(200),
@@ -21,6 +22,7 @@ export const createProductSchema = z.object({
   subCategoryId: z.string().optional().nullable(),
   specifications: z.string().optional().nullable(),
   customization: z.string().optional().nullable(),
+  customizationConfig: customizationConfigSchema.optional(),
   shippingReturns: z.string().optional().nullable(),
   tags: z.array(z.string()).optional().default([]),
   rating: z.number().optional().default(4.8),

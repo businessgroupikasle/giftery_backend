@@ -22,6 +22,7 @@ const productSelect = {
   subCategoryId: true,
   specifications: true,
   customization: true,
+  customizationConfig: true,
   shippingReturns: true,
   tags: true,
   rating: true,

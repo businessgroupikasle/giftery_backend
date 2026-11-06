@@ -2,7 +2,7 @@ import { orderRepository } from '../repositories/orderRepository.js';
 import prisma from '../config/db.js';
 import { paginate, paginatedResponse } from '../utils/pagination.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
-import { validateCustomization, validateSavedCustomization } from './customizationService.js';
+import { customizationCharge, loadPurchasableDesign, validateSnapshotAssets } from './customizationService.js';
 import { calculateOrderPricing } from './orderPricing.js';
 
 export const orderService = {
@@ -36,8 +36,8 @@ export const orderService = {
     return order;
   },
 
-  createFromCart: async (userId, { items, shippingAddress, notes, paymentMethod = 'COD', couponCode, expectedTotal, totalAmount }) => {
-    if (String(paymentMethod).toUpperCase() !== 'COD') { const err = new Error('Online payment is temporarily unavailable'); err.statusCode = 503; throw err; }
+  createFromCart: async (userId, { orderNumber, items, shippingAddress, notes, paymentMethod = 'COD', couponCode, expectedTotal, totalAmount }) => {
+    const normalizedPaymentMethod = String(paymentMethod).toUpperCase();
     const expected = expectedTotal ?? totalAmount;
     if (!Number.isFinite(expected) || expected < 0) { const err = new Error('Expected total is required'); err.statusCode = 400; throw err; }
     return prisma.$transaction(async (tx) => {
@@ -50,7 +50,10 @@ export const orderService = {
       orderItemsData = items.map((item) => ({
         productId: item.productId || item.id,
         quantity: item.quantity,
-        customization: item.customization || null,
+        customizationId: item.customizationId || null,
+        // Only an ID is honoured: the snapshot is rebuilt below from the customer's saved design.
+        customization: null,
+        unsavedCustomization: Boolean(item.customization && !item.customizationId),
       }));
     } else {
       // Pull from database Cart
@@ -74,14 +77,21 @@ export const orderService = {
         name: item.product.name,
         image: item.product.images[0] || null,
         customization: item.customization,
+        customizationId: item.customizationId,
+        fromCart: true,
       }));
 
       calculatedTotal = cart.items.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
     }
 
     for (const item of orderItemsData) {
-      if (item.customization) {
-        await validateSavedCustomization(userId, item.productId, item.customization, tx);
+      if (item.unsavedCustomization) {
+        const err = new Error('Save the current customization and preview before adding it to your cart'); err.statusCode = 400; throw err;
+      }
+      if (item.fromCart) {
+        if (item.customization) await validateSnapshotAssets(userId, item.customization, tx);
+      } else if (item.customizationId) {
+        item.customization = await loadPurchasableDesign(userId, item.productId, item.customizationId, tx);
       }
       if (!Number.isInteger(item.quantity) || item.quantity < 1) { const err = new Error('Invalid quantity'); err.statusCode = 400; throw err; }
     }
@@ -90,7 +100,8 @@ export const orderService = {
       for (const item of orderItemsData) {
         const product = await tx.product.findUnique({ where: { id: item.productId } });
         if (!product || !product.isActive || !Number.isFinite(product.price) || product.price < 0) { const err = new Error('Product unavailable'); err.statusCode = 400; throw err; }
-        const unitPaise = Math.round(product.price * 100);
+        item.customizationCharge = customizationCharge(product, Boolean(item.customization));
+        const unitPaise = Math.round((product.price + item.customizationCharge) * 100);
         item.price = unitPaise / 100;
         item.catalogPrice = product.price;
         item.name = product.name;
@@ -110,11 +121,12 @@ export const orderService = {
       const newOrder = await tx.order.create({
         data: {
           userId,
+          orderNumber,
           totalAmount: pricing.totalAmount,
           pricing,
           shippingAddress: shippingAddress || {},
           notes,
-          payment: { create: { method: 'COD', amount: pricing.totalAmount, currency: 'INR' } },
+          payment: { create: { method: normalizedPaymentMethod, amount: pricing.totalAmount, currency: 'INR' } },
           items: {
             create: orderItemsData.map((item) => ({
               productId: item.productId,
@@ -122,14 +134,25 @@ export const orderService = {
               price: item.price,
               name: item.name,
               image: item.image,
-              ...(item.customization ? { customization: item.customization } : {}),
+              ...(item.customization ? {
+                customization: item.customization,
+                customizationId: item.customizationId || null,
+                customizationCharge: item.customizationCharge,
+                customizationStatus: 'PENDING_REVIEW',
+                customizationStatusAt: new Date(),
+              } : {}),
             })),
           },
         },
         include: { items: true },
       });
 
-      if (cartItemIds) {
+      const orderedDesignIds = orderItemsData.filter((item) => item.customization && item.customizationId).map((item) => item.customizationId);
+      if (orderedDesignIds.length) {
+        await tx.customizationDesign.updateMany({ where: { id: { in: orderedDesignIds }, userId }, data: { status: 'ORDERED' } });
+      }
+
+      if (cartItemIds && normalizedPaymentMethod === 'COD') {
         const deleted = await tx.cartItem.deleteMany({ where: { id: { in: cartItemIds }, cart: { userId } } });
         if (deleted.count !== cartItemIds.length) { const err = new Error('Cart changed during checkout'); err.statusCode = 409; throw err; }
       }
