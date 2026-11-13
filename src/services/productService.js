@@ -13,6 +13,14 @@ const sortMap = {
   featured: [{ featured: 'desc' }, { id: 'desc' }],
 };
 
+// Homepage collection tabs -> product flag column
+const collectionFlagMap = {
+  bestsellers: 'isBestseller',
+  popular: 'isPopular',
+  new: 'isNewArrival',
+  giftsets: 'isGiftSet',
+};
+
 const sanitizeProductData = (inputData = {}) => {
   const data = { ...inputData };
 
@@ -96,7 +104,7 @@ const sanitizeProductData = (inputData = {}) => {
 
 export const productService = {
   getAll: async (query) => {
-    const { page, limit, search, categoryId, subCategoryId, minPrice, maxPrice, sort, featured, showAll, view } = query;
+    const { page, limit, search, categoryId, subCategoryId, minPrice, maxPrice, sort, featured, collection, showAll, view } = query;
 
     const andConditions = [];
 
@@ -133,6 +141,10 @@ export const productService = {
 
     if (featured !== undefined) {
       andConditions.push({ featured: featured === 'true' });
+    }
+
+    if (collection && collectionFlagMap[collection]) {
+      andConditions.push({ [collectionFlagMap[collection]]: true });
     }
 
     if (minPrice || maxPrice) {
