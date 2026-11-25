@@ -106,7 +106,7 @@ async function main() {
 
   console.log('Main Categories created (Corporate Gifts, Personalized Gifts, Toys)');
 
-  // ── 2. Corporate Gifts Subcategories (16 Subcategories) ─────────────
+  // ── 2. Corporate Gifts Subcategories (25 Subcategories) ─────────────
   const corpSubcategories = [
     { name: 'Onboarding Kit', slug: 'onboarding-kit' },
     { name: 'Work Anniversary Kit', slug: 'work-anniversary-kit' },
@@ -124,6 +124,15 @@ async function main() {
     { name: 'Premium Gifts', slug: 'premium-gifts' },
     { name: 'Cups & Mugs', slug: 'cups-mugs' },
     { name: 'Keychains', slug: 'keychains' },
+    { name: '2-in-1 Combo', slug: '2-in-1-combo' },
+    { name: '3-in-1 Combo', slug: '3-in-1-combo' },
+    { name: '4-in-1 Combo', slug: '4-in-1-combo' },
+    { name: '5-in-1 Combo', slug: '5-in-1-combo' },
+    { name: '6-in-1 Combo', slug: '6-in-1-combo' },
+    { name: '7-in-1 Combo', slug: '7-in-1-combo' },
+    { name: '8-in-1 Combo', slug: '8-in-1-combo' },
+    { name: '9-in-1 Combo', slug: '9-in-1-combo' },
+    { name: '10-in-1 Combo', slug: '10-in-1-combo' },
   ];
 
   for (const sub of corpSubcategories) {
