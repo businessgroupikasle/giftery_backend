@@ -70,6 +70,7 @@ model User {
   updatedAt         DateTime @updatedAt
 
   orders    Order[]
+  checkoutSessions CheckoutSession[]
   cart      Cart?
   wishlist  Wishlist?
   reviews   Review[]
@@ -152,6 +153,7 @@ model Product {
   wishlistItems WishlistItem[]
   reviews       Review[]
   customizationDesigns CustomizationDesign[]
+  enquiries     Enquiry[]
 
   @@map("products")
 }
@@ -316,6 +318,29 @@ model Payment {
   @@map("payments")
 }
 
+/// An online payment in progress. No Order exists until Razorpay confirms the payment was captured;
+/// the order is then built from `input` (the validated checkout body) in one transaction.
+model CheckoutSession {
+  id                String   @id @default(cuid())
+  userId            String
+  razorpayOrderId   String   @unique
+  razorpayPaymentId String?  @unique
+  input             Json
+  amount            Int
+  currency          String   @default("INR")
+  /// PENDING -> PAID (order created) | REFUNDING -> REFUNDED | REFUND_FAILED
+  status            String   @default("PENDING")
+  orderId           String?  @unique
+  failureReason     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, status])
+  @@map("checkout_sessions")
+}
+
 model Review {
   id        String   @id @default(cuid())
   userId    String
@@ -343,6 +368,20 @@ model Enquiry {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Bulk order inquiries (type = BULK_ORDER) from the product details page.
+  // Name and SKU are snapshots so the record stays readable if the product changes.
+  type         String   @default("GENERAL")
+  productId    String?
+  productName  String?
+  productSku   String?
+  quantity     Int?
+  company      String?
+  requirements String?
+
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([type, createdAt])
+  @@index([productId])
   @@map("enquiries")
 }
 

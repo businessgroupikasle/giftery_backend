@@ -25,8 +25,8 @@ export const createProductSchema = z.object({
   customizationConfig: customizationConfigSchema.optional(),
   shippingReturns: z.string().optional().nullable(),
   tags: z.array(z.string()).optional().default([]),
-  rating: z.number().optional().default(4.8),
-  reviewsCount: z.number().optional().default(128),
+  rating: z.number().min(0).max(5).optional().default(0),
+  reviewsCount: z.number().int().min(0).optional().default(0),
 });
 
 export const updateProductSchema = createProductSchema.partial();

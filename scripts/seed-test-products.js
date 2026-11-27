@@ -47,8 +47,8 @@ async function main() {
       categoryId: category.id,
       subCategoryId: subcategory.id,
       tags: ['test-product', item.category, item.subcategory],
-      rating: 4.8,
-      reviewsCount: 24,
+      rating: 0,
+      reviewsCount: 0,
     };
 
     await prisma.product.upsert({

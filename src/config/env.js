@@ -14,6 +14,7 @@ const envSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
+  RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
   GOOGLE_CLIENT_ID: z.string().optional(),
   GOOGLE_CLIENT_SECRET: z.string().optional(),
   SMTP_HOST: z.string().optional(),
@@ -24,6 +25,8 @@ const envSchema = z.object({
   EMAIL_FROM: z.string().email().optional(),
   EMAIL_FROM_NAME: z.string().default('GIFTERY'),
   ADMIN_NOTIFICATION_EMAIL: z.string().email().optional(),
+  // Public storefront address, used for links in customer emails (e.g. the catalogue PDF).
+  SITE_URL: z.string().url().optional(),
   UPLOAD_DIR: z.string().default('uploads'),
   PRIVATE_ARTWORK_DIR: z.string().default('private-artwork'),
   MAX_FILE_SIZE: z.string().default('5242880').transform(Number),

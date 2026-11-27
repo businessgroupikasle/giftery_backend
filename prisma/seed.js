@@ -299,7 +299,13 @@ async function main() {
     },
   ];
 
-  await prisma.product.createMany({ data: products });
+  await prisma.product.createMany({
+    data: products.map((product) => ({
+      ...product,
+      rating: 0,
+      reviewsCount: 0,
+    })),
+  });
 
   console.log(' 10 Products created (4 Corporate + 3 Personalized + 3 Toys)');
   console.log('\n Seed complete! Categories, Subcategories & Products are loaded in Database!');

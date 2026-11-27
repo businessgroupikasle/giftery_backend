@@ -43,3 +43,9 @@ export const productStatusQuerySchema = z.object({
   limit: z.string().default('20'),
   status: z.enum(['active', 'inactive']),
 });
+
+/** GET /dashboard/summary — optional ISO date-time bounds for activity counts. */
+export const dashboardSummaryQuerySchema = z.object({
+  from: z.coerce.date({ invalid_type_error: 'from must be a date' }).optional(),
+  to: z.coerce.date({ invalid_type_error: 'to must be a date' }).optional(),
+}).refine(({ from, to }) => !from || !to || from <= to, { message: 'from must be before to', path: ['from'] });

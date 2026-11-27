@@ -22,6 +22,19 @@ export const globalLimiter = rateLimit({
 });
 
 /**
+ * Limiter for public inquiry forms (bulk order inquiries): blocks scripted spam
+ * while leaving room for a customer who asks about several products.
+ */
+export const inquiryLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler,
+  skip: skipInDev,
+});
+
+/**
  * Stricter limiter for auth endpoints.
  */
 export const authLimiter = rateLimit({

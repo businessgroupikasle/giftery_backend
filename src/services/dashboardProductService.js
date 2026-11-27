@@ -215,7 +215,7 @@ export const dashboardProductService = {
         ...(product.customizationConfig ? { customizationConfig: product.customizationConfig } : {}),
         shippingReturns: product.shippingReturns,
         tags: product.tags,
-        rating: product.rating,
+        rating: 0,
         reviewsCount: 0,
       },
       select: {

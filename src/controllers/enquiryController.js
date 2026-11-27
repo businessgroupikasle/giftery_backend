@@ -2,6 +2,10 @@ import { normalizeContactPhone } from '../utils/phone.js';
 import { sendSuccess, sendError } from '../utils/response.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
 import { emitEnquiryCreated } from '../sockets/index.js';
+import { nextEnquiryId } from '../utils/enquiryId.js';
+import { sendEnquiryNotifications } from '../helpers/email.js';
+import { logger } from '../config/logger.js';
+import { BULK_ORDER_ENQUIRY_TYPE, createBulkOrderInquiry, listBulkOrderInquiries, updateBulkOrderInquiryStatus } from '../services/bulkInquiryService.js';
 import prisma from '../config/db.js';
 
 // In-memory store fallback for enquiries
@@ -26,15 +30,7 @@ export const enquiryController = {
       let newEnquiry;
       try {
         if (prisma.enquiry) {
-          const totalEnquiries = await prisma.enquiry.count();
-          let readableId = `ENQ-${year}-${String(totalEnquiries + 1).padStart(4, '0')}`;
-          let exists = await prisma.enquiry.findUnique({ where: { id: readableId } });
-          let seq = totalEnquiries + 1;
-          while (exists) {
-            seq += 1;
-            readableId = `ENQ-${year}-${String(seq).padStart(4, '0')}`;
-            exists = await prisma.enquiry.findUnique({ where: { id: readableId } });
-          }
+          const readableId = await nextEnquiryId(prisma);
 
           newEnquiry = await prisma.enquiry.create({
             data: {
@@ -80,10 +76,46 @@ export const enquiryController = {
         createdAt: newEnquiry.createdAt || new Date().toISOString(),
       });
 
+      // Quote and catalogue requests email the admin and the customer. Sent in the
+      // background so a slow or failing mail server never blocks the saved enquiry.
+      sendEnquiryNotifications(newEnquiry).catch((err) => {
+        logger.error(`Enquiry ${newEnquiry.id}: notification failed — ${err.message}`);
+      });
+
       return sendSuccess(res, newEnquiry, 'Enquiry submitted successfully', HTTP_STATUS.CREATED);
     } catch (err) {
       return sendError(res, err.message || 'Failed to submit enquiry', HTTP_STATUS.INTERNAL_SERVER_ERROR);
     }
+  },
+
+  // Public: Bulk order inquiry from the product details page (body validated by bulkOrderInquirySchema)
+  createBulkOrderInquiry: async (req, res) => {
+    const inquiry = await createBulkOrderInquiry(req.body);
+    return sendSuccess(
+      res,
+      {
+        id: inquiry.id,
+        productId: inquiry.productId,
+        productName: inquiry.productName,
+        productSku: inquiry.productSku,
+        quantity: inquiry.quantity,
+        createdAt: inquiry.createdAt,
+      },
+      'Bulk order inquiry submitted successfully',
+      HTTP_STATUS.CREATED
+    );
+  },
+
+  // Admin: bulk order inquiries for the dashboard "Bulk Orders" tab (query validated by bulkOrderListQuerySchema)
+  listBulkOrders: async (req, res) => {
+    const result = await listBulkOrderInquiries(req.query);
+    return sendSuccess(res, result, 'Bulk order inquiries fetched successfully');
+  },
+
+  // Admin: move a bulk inquiry along the pipeline (body validated by bulkOrderStatusSchema)
+  updateBulkOrderStatus: async (req, res) => {
+    const inquiry = await updateBulkOrderInquiryStatus(req.params.id, req.body.status);
+    return sendSuccess(res, inquiry, 'Bulk order inquiry status updated');
   },
 
   // Admin/SuperAdmin: Get all enquiries
@@ -92,7 +124,9 @@ export const enquiryController = {
       let dbEnquiries = [];
       try {
         if (prisma.enquiry) {
+          // Bulk order inquiries have their own dashboard tab.
           dbEnquiries = await prisma.enquiry.findMany({
+            where: { type: { not: BULK_ORDER_ENQUIRY_TYPE } },
             orderBy: { createdAt: 'desc' },
           });
         }

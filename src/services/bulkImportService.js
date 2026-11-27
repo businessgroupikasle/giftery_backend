@@ -713,8 +713,8 @@ export const bulkImportService = {
           isMostLoved: Boolean(item.isMostLoved),
           isGiftSet: Boolean(item.isGiftSet),
           isActive: item.isActive !== false,
-          rating: 4.8,
-          reviewsCount: 128,
+          rating: 0,
+          reviewsCount: 0,
         };
 
         if (item.id && item.action === 'UPDATE') {

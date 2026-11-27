@@ -48,6 +48,15 @@ const getValidity = (coupon) => {
 
 const withValidity = (coupon) => ({ ...coupon, validity: getValidity(coupon) });
 
+/** Totals for the admin overview: a coupon is live when it is Active and inside its dates. */
+export const summarizeCoupons = () => {
+  const coupons = readCoupons();
+  return {
+    total: coupons.length,
+    live: coupons.filter((coupon) => coupon.status === 'Active' && getValidity(coupon) === 'Valid').length,
+  };
+};
+
 export const resolveCoupon = (code) => {
   const normalized = String(code || '').trim().toUpperCase();
   if (!normalized) return null;

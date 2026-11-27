@@ -53,7 +53,7 @@ const sanitizeProductData = (inputData = {}) => {
     data.comparePrice = data.comparePrice !== null && data.comparePrice !== '' ? parseFloat(data.comparePrice) : null;
   }
   if (data.stock !== undefined) data.stock = parseInt(data.stock, 10) || 0;
-  if (data.rating !== undefined) data.rating = parseFloat(data.rating) || 4.8;
+  if (data.rating !== undefined) data.rating = parseFloat(data.rating) || 0;
   if (data.reviewsCount !== undefined) data.reviewsCount = parseInt(data.reviewsCount, 10) || 0;
   if (data.weight !== undefined) {
     data.weight = data.weight !== null && data.weight !== '' ? parseFloat(data.weight) : null;
@@ -187,6 +187,8 @@ export const productService = {
 
   create: async (rawInput) => {
     const data = sanitizeProductData(rawInput);
+    if (data.rating === undefined) data.rating = 0;
+    if (data.reviewsCount === undefined) data.reviewsCount = 0;
     const slug = slugify(data.name || 'product');
     const existing = await productRepository.existsBySlug(slug);
     data.slug = existing ? `${slug}-${Date.now()}` : slug;

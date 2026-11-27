@@ -181,3 +181,224 @@ export const sendAdminOrderNotification = (order, user = {}) => {
   if (!to) throw new Error('Admin notification email is not configured');
   return sendEmail({ to, ...buildAdminOrderNotificationEmail(order, user) });
 };
+// ── Bulk order inquiries ───────────────────────────────────────
+
+export const BULK_OFFER_LABEL = '10% OFF BULK ORDER OFFER';
+
+const formatInquiryDate = (value) => new Intl.DateTimeFormat('en-IN', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'Asia/Kolkata',
+}).format(new Date(value || Date.now()));
+
+const bulkInquiryRows = (inquiry) => [
+  ['Inquiry ID', inquiry.id],
+  ['Product name', inquiry.productName],
+  ['Product ID', inquiry.productId],
+  ['SKU', inquiry.productSku || 'Not available'],
+  ['Requested quantity', Number(inquiry.quantity).toLocaleString('en-IN')],
+  ['Customer name', inquiry.name],
+  ['Phone number', inquiry.phone],
+  ['Email address', inquiry.email],
+  ['Company name', inquiry.company || 'Not provided'],
+  ['Additional requirements', inquiry.requirements || 'None'],
+  ['Submitted at', `${formatInquiryDate(inquiry.createdAt)} IST`],
+  ['Offer', BULK_OFFER_LABEL],
+];
+
+const renderEmailShell = (title, bodyHtml) => `
+  <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #f8fafc; padding: 32px 16px; color: #1e293b;">
+    <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
+      <div style="background-color: #111317; padding: 24px; text-align: center; border-bottom: 3px solid #d99b26;">
+        <h1 style="color: #f7d58b; font-family: Georgia, serif; font-size: 24px; margin: 0; letter-spacing: 0.1em;">GIFTERY</h1>
+      </div>
+      <div style="padding: 28px 24px;">
+        <h2 style="font-size: 20px; color: #0f172a; margin: 0 0 16px;">${escapeHtml(title)}</h2>
+        ${bodyHtml}
+      </div>
+      <div style="background-color: #f8fafc; padding: 14px 24px; text-align: center; border-top: 1px solid #f1f5f9; font-size: 11px; color: #94a3b8;">
+        &copy; ${new Date().getFullYear()} GIFTERY. All rights reserved.
+      </div>
+    </div>
+  </div>`;
+
+const renderRowsTable = (rows) => `
+  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+    ${rows.map(([label, value]) => `<tr>
+      <td style="padding: 8px 10px; border-bottom: 1px solid #f1f5f9; color: #64748b; width: 40%; vertical-align: top;">${escapeHtml(label)}</td>
+      <td style="padding: 8px 10px; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-weight: 600; white-space: pre-wrap;">${escapeHtml(value)}</td>
+    </tr>`).join('')}
+  </table>`;
+
+export const buildAdminBulkInquiryEmail = (inquiry) => {
+  const rows = bulkInquiryRows(inquiry);
+  const html = renderEmailShell('New bulk order inquiry', `
+    <div style="margin-bottom: 18px; padding: 12px 14px; background: #fff7ed; border-left: 4px solid #d99b26; border-radius: 6px; font-weight: 700; color: #92400e;">
+      ${escapeHtml(BULK_OFFER_LABEL)}: confirm bulk pricing, eligibility and availability with the customer.
+    </div>
+    ${renderRowsTable(rows)}`);
+  const text = [
+    'New bulk order inquiry',
+    '',
+    ...rows.map(([label, value]) => `${label}: ${value}`),
+  ].join('\n');
+  return {
+    subject: `Bulk order inquiry: ${inquiry.productName} x ${inquiry.quantity} (${inquiry.id})`,
+    html,
+    text,
+  };
+};
+
+export const buildCustomerBulkInquiryEmail = (inquiry) => {
+  const rows = [
+    ['Inquiry ID', inquiry.id],
+    ['Product', inquiry.productName],
+    ['SKU', inquiry.productSku || 'Not available'],
+    ['Requested quantity', Number(inquiry.quantity).toLocaleString('en-IN')],
+    ['Company', inquiry.company || 'Not provided'],
+    ['Additional requirements', inquiry.requirements || 'None'],
+  ];
+  const intro = 'We have received your bulk order inquiry. Our team will contact you shortly to discuss your bulk order and your eligibility for our 10% bulk order offer.';
+  const note = 'No discount has been applied yet. Final bulk pricing, eligibility and availability will be confirmed by our team when they contact you.';
+  const html = renderEmailShell('Bulk order inquiry received', `
+    <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-top: 0;">Hello <strong>${escapeHtml(inquiry.name)}</strong>,</p>
+    <p style="font-size: 14px; color: #475569; line-height: 1.6;">${escapeHtml(intro)}</p>
+    ${renderRowsTable(rows)}
+    <p style="font-size: 12px; color: #64748b; line-height: 1.5; margin-top: 18px;">${escapeHtml(note)}</p>
+    <p style="font-size: 13px; color: #475569; margin-top: 18px;">Regards,<br /><strong>Giftery Team</strong></p>`);
+  const text = [
+    `Hello ${inquiry.name},`,
+    '',
+    intro,
+    '',
+    ...rows.map(([label, value]) => `${label}: ${value}`),
+    '',
+    note,
+    '',
+    'Regards,',
+    'Giftery Team',
+  ].join('\n');
+  return { subject: `We received your bulk order inquiry (${inquiry.id})`, html, text };
+};
+
+/**
+ * Emails the admin and the customer about a new bulk inquiry.
+ * Never throws: each result is reported so a mail failure can't undo a saved inquiry.
+ */
+export const sendBulkInquiryNotifications = async (inquiry) => {
+  const adminTo = env.ADMIN_NOTIFICATION_EMAIL || env.SMTP_USER;
+  const [admin, customer] = await Promise.allSettled([
+    adminTo
+      ? sendEmail({ to: adminTo, ...buildAdminBulkInquiryEmail(inquiry) })
+      : Promise.reject(new Error('Admin notification email is not configured')),
+    sendEmail({ to: inquiry.email, ...buildCustomerBulkInquiryEmail(inquiry) }),
+  ]);
+  if (admin.status === 'rejected') {
+    logger.warn(`Bulk inquiry ${inquiry.id}: admin notification email not sent — ${admin.reason?.message}`);
+  }
+  if (customer.status === 'rejected') {
+    logger.warn(`Bulk inquiry ${inquiry.id}: customer confirmation email not sent — ${customer.reason?.message}`);
+  }
+  return { admin: admin.status === 'fulfilled', customer: customer.status === 'fulfilled' };
+};
+
+// ── Quote & catalogue enquiries (POST /enquiries) ──────────────
+
+export const CATALOGUE_PDF_PATH = '/downloads/Giftery_Corporate_Catalogue.pdf';
+const VALID_EMAIL = /^[^\s@<>"',;]+@[^\s@<>"',;]+\.[^\s@<>"',;]{2,}$/;
+
+/**
+ * Which enquiries send emails, read from the subject the storefront sets:
+ * "Product Quote: <name>" (product page) and "Catalogue Request" /
+ * "Corporate Catalogue Request" (floating button, contact page).
+ * Other enquiries (contact messages, studio appointments) return null.
+ */
+export const classifyEnquiry = (enquiry = {}) => {
+  const subject = String(enquiry.subject || '');
+  if (/appointment/i.test(subject)) return null;
+  if (/catalogue/i.test(subject)) return 'CATALOGUE';
+  if (/quote/i.test(subject)) return 'QUOTE';
+  return null;
+};
+
+const ENQUIRY_KINDS = {
+  QUOTE: { label: 'Quote request', adminTitle: 'New quote request' },
+  CATALOGUE: { label: 'Catalogue download', adminTitle: 'New catalogue download' },
+};
+
+const quotedProduct = (enquiry) => String(enquiry.subject || '').replace(/^.*?quote\s*:\s*/i, '').trim();
+const catalogueUrl = (siteUrl) => (siteUrl ? `${String(siteUrl).replace(/\/+$/, '')}${CATALOGUE_PDF_PATH}` : null);
+
+export const buildAdminEnquiryEmail = (enquiry, kind) => {
+  const { label, adminTitle } = ENQUIRY_KINDS[kind];
+  const rows = [
+    ['Enquiry ID', enquiry.id],
+    ['Type', label],
+    ['Customer name', enquiry.name],
+    ['Email address', enquiry.email],
+    ['Phone number', enquiry.phone || 'Not provided'],
+    ['Subject', enquiry.subject],
+    ['Details', enquiry.message],
+    ['Submitted at', `${formatInquiryDate(enquiry.createdAt)} IST`],
+  ];
+  const html = renderEmailShell(adminTitle, `
+    <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-top: 0;">
+      ${kind === 'QUOTE' ? 'A customer asked for a quotation. Reply with pricing and availability.' : 'A customer downloaded the product catalogue. A follow-up call may turn this into an order.'}
+    </p>
+    ${renderRowsTable(rows)}`);
+  const text = [adminTitle, '', ...rows.map(([key, value]) => `${key}: ${value}`)].join('\n');
+  const subject = kind === 'QUOTE'
+    ? `New quote request: ${quotedProduct(enquiry) || enquiry.name} (${enquiry.id})`
+    : `New catalogue download: ${enquiry.name} (${enquiry.id})`;
+  return { subject, html, text };
+};
+
+export const buildCustomerEnquiryEmail = (enquiry, kind, siteUrl = env.SITE_URL) => {
+  const rows = [
+    ['Reference', enquiry.id],
+    ...(kind === 'QUOTE' ? [['Product', quotedProduct(enquiry) || 'As described'], ['Your details', enquiry.message]] : []),
+  ];
+  const link = kind === 'CATALOGUE' ? catalogueUrl(siteUrl) : null;
+  const lines = kind === 'QUOTE'
+    ? ['Thank you for your quote request. Our gifting team will review your requirements and contact you shortly with pricing and availability.']
+    : [
+      'Thank you for downloading the Giftery corporate gifting catalogue.',
+      'If you would like a quotation, customised branding or bulk pricing, just reply to this email and our team will help you.',
+    ];
+  const html = renderEmailShell(kind === 'QUOTE' ? 'We received your quote request' : 'Your Giftery catalogue', `
+    <p style="font-size: 14px; color: #475569; line-height: 1.6; margin-top: 0;">Hello <strong>${escapeHtml(enquiry.name)}</strong>,</p>
+    ${lines.map((line) => `<p style="font-size: 14px; color: #475569; line-height: 1.6;">${escapeHtml(line)}</p>`).join('')}
+    ${link ? `<p style="margin: 22px 0; text-align: center;"><a href="${escapeHtml(link)}" style="display: inline-block; padding: 12px 22px; border-radius: 8px; background: #d99b26; color: #111317; font-weight: 700; text-decoration: none;">Download the catalogue (PDF)</a></p>` : ''}
+    ${renderRowsTable(rows)}
+    <p style="font-size: 13px; color: #475569; margin-top: 18px;">Regards,<br /><strong>Giftery Team</strong></p>`);
+  const text = [
+    `Hello ${enquiry.name},`, '', ...lines, ...(link ? ['', `Download the catalogue: ${link}`] : []), '',
+    ...rows.map(([key, value]) => `${key}: ${value}`), '', 'Regards,', 'Giftery Team',
+  ].join('\n');
+  return {
+    subject: kind === 'QUOTE' ? `We received your quote request (${enquiry.id})` : 'Your Giftery corporate gifting catalogue',
+    html,
+    text,
+  };
+};
+
+/**
+ * Emails the admin and the customer for quote and catalogue enquiries.
+ * Returns null for enquiries that don't send mail. Never throws for a mail failure.
+ */
+export const sendEnquiryNotifications = async (enquiry) => {
+  const kind = classifyEnquiry(enquiry);
+  if (!kind) return null;
+  const adminTo = env.ADMIN_NOTIFICATION_EMAIL || env.SMTP_USER;
+  const [admin, customer] = await Promise.allSettled([
+    adminTo
+      ? sendEmail({ to: adminTo, ...buildAdminEnquiryEmail(enquiry, kind) })
+      : Promise.reject(new Error('Admin notification email is not configured')),
+    VALID_EMAIL.test(String(enquiry.email || '').trim())
+      ? sendEmail({ to: String(enquiry.email).trim(), ...buildCustomerEnquiryEmail(enquiry, kind) })
+      : Promise.reject(new Error('Customer email is missing or invalid')),
+  ]);
+  if (admin.status === 'rejected') logger.warn(`Enquiry ${enquiry.id}: admin ${kind.toLowerCase()} email not sent — ${admin.reason?.message}`);
+  if (customer.status === 'rejected') logger.warn(`Enquiry ${enquiry.id}: customer ${kind.toLowerCase()} email not sent — ${customer.reason?.message}`);
+  return { kind, admin: admin.status === 'fulfilled', customer: customer.status === 'fulfilled' };
+};

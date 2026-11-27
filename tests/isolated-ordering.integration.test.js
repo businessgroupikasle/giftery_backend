@@ -84,7 +84,7 @@ test('isolated PostgreSQL customized and ordinary ordering', { skip: !process.en
     const paise = Math.round(product.price * 100);
     const price = paise / 100;
     await send('/orders', 1, 'POST', { shippingAddress: {}, items: [{ productId: product.id, quantity: 1, customizationId: first.id }], expectedTotal: price }, 400);
-    await send('/orders', 0, 'POST', { shippingAddress: {}, items: [{ productId: product.id, quantity: 1 }], expectedTotal: price, paymentMethod: 'RAZORPAY' }, 503);
+    await send('/orders', 0, 'POST', { shippingAddress: {}, items: [{ productId: product.id, quantity: 1 }], expectedTotal: price, paymentMethod: 'RAZORPAY' }, 400);
     const direct = (await send('/orders', 0, 'POST', { shippingAddress: {}, items: [{ productId: product.id, quantity: 2, price: 0, name: 'Spoof', customizationId: second.id }], expectedTotal: calculateOrderPricing(paise * 2).totalAmount, paymentMethod: 'COD' }, 201)).order;
     assert.equal(direct.items[0].price, price);
     assert.equal(direct.items[0].name, product.name);

@@ -12,6 +12,7 @@ import { logger } from './config/logger.js';
 import { globalLimiter } from './middleware/rateLimiter.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import apiRoutes from './routes/index.js';
+import { paymentController } from './controllers/paymentController.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -44,6 +45,10 @@ app.use(morgan('combined', {
 
 // ── Rate Limiting ───────────────────────────────────────────────
 app.use(globalLimiter);
+
+// ── Razorpay webhook ────────────────────────────────────────────
+// Registered before express.json: the signature is checked against the exact raw bytes Razorpay sent.
+app.post('/api/v1/payments/razorpay/webhook', express.raw({ type: '*/*', limit: '1mb' }), paymentController.razorpayWebhook);
 
 // ── Body Parsing ────────────────────────────────────────────────
 app.use(express.json({ limit: '50mb' }));
