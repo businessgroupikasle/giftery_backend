@@ -1,5 +1,6 @@
 import prisma from '../config/db.js';
 import { summarizeCoupons } from '../controllers/couponController.js';
+import { SALE_WHERE } from './dashboardOverviewService.js';
 
 /*
  * One count per admin sidebar section, read straight from the database so the
@@ -11,7 +12,6 @@ import { summarizeCoupons } from '../controllers/couponController.js';
  */
 
 const NEW_STATUS = { equals: 'new', mode: 'insensitive' };
-const CLOSED_ORDER_STATUSES = ['CANCELLED', 'REFUNDED'];
 const OPEN_ORDER_STATUSES = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED'];
 const STAFF_ROLES = ['ADMIN', 'SUPER_ADMIN', 'VENDOR'];
 
@@ -51,7 +51,8 @@ export const getDashboardSummary = async (range = {}) => {
     catalogueTotal, catalogueNew,
     staffByRole,
   ] = await Promise.all([
-    prisma.order.aggregate({ _sum: { totalAmount: true }, where: { ...inRange, status: { notIn: CLOSED_ORDER_STATUSES } } }),
+    // Revenue counts sales only: not cancelled/refunded, and online payments that succeeded.
+    prisma.order.aggregate({ _sum: { totalAmount: true }, where: { ...inRange, ...SALE_WHERE } }),
     prisma.order.count({ where: inRange }),
     prisma.order.count({ where: { ...inRange, status: { in: OPEN_ORDER_STATUSES } } }),
     prisma.order.count({ where: { ...inRange, status: 'DELIVERED' } }),

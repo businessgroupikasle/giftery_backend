@@ -4,7 +4,7 @@ import { authenticate } from '../middleware/auth.js';
 import { authorize } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { createProductSchema, updateProductSchema } from '../validations/productValidation.js';
-import { dashboardSummaryQuerySchema } from '../validations/dashboardValidation.js';
+import { dashboardOverviewQuerySchema, dashboardSummaryQuerySchema } from '../validations/dashboardValidation.js';
 
 const router = Router();
 
@@ -12,6 +12,7 @@ router.use(authenticate, authorize('ADMIN'));
 
 router.get('/stats', dashboardController.getStats);
 router.get('/summary', validate(dashboardSummaryQuerySchema, 'query'), dashboardController.getSummary);
+router.get('/overview', validate(dashboardOverviewQuerySchema, 'query'), dashboardController.getOverview);
 router.get('/products/stats', dashboardController.getProductStats);
 
 router.get('/products', dashboardController.getProducts);

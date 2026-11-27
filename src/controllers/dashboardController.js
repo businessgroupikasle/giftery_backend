@@ -3,6 +3,7 @@ import { sendSuccess, sendError } from '../utils/response.js';
 import { HTTP_STATUS } from '../shared/constants/httpStatus.js';
 import { dashboardProductService } from '../services/dashboardProductService.js';
 import { getDashboardSummary } from '../services/dashboardSummaryService.js';
+import { getDashboardOverview } from '../services/dashboardOverviewService.js';
 
 export const dashboardController = {
   getStats: async (req, res, next) => {
@@ -65,6 +66,12 @@ export const dashboardController = {
   },
 
   // One live count per sidebar section for the overview cards
+  getOverview: async (req, res, next) => {
+    try {
+      sendSuccess(res, await getDashboardOverview(req.query));
+    } catch (err) { next(err); }
+  },
+
   getSummary: async (req, res, next) => {
     try {
       sendSuccess(res, await getDashboardSummary({ from: req.query.from, to: req.query.to }));

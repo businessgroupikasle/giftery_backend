@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { OVERVIEW_RANGES } from '../services/dashboardOverviewService.js';
 
 export const updateProductStatusSchema = z.object({
   isActive: z.boolean(),
@@ -49,3 +50,13 @@ export const dashboardSummaryQuerySchema = z.object({
   from: z.coerce.date({ invalid_type_error: 'from must be a date' }).optional(),
   to: z.coerce.date({ invalid_type_error: 'to must be a date' }).optional(),
 }).refine(({ from, to }) => !from || !to || from <= to, { message: 'from must be before to', path: ['from'] });
+
+const overviewRange = (fallback) => z.enum(OVERVIEW_RANGES).default(fallback);
+
+/** GET /dashboard/overview: one range per chart, so each dropdown works on its own. */
+export const dashboardOverviewQuerySchema = z.object({
+  sales: z.enum(['week', 'month', 'year']).default('week'),
+  categories: overviewRange('week'),
+  status: overviewRange('week'),
+  products: overviewRange('all'),
+});
